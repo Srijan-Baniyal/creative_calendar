@@ -1,44 +1,57 @@
 # Creative Calendar Frontend Challenge
 
-Interactive wall-calendar style component built with Next.js App Router and React, focused on frontend engineering quality, responsive UX, and polished interaction design.
+Polished, interactive wall-calendar experience built in Next.js and React, with a hero-led composition, date-range planning, integrated notes, and a full design-system driven UI surface.
 
-## Challenge Summary
+## What Is Implemented
 
-The component is expected to deliver:
+- Wall calendar aesthetic:
+  - Large hero image panel with tonal overlays and context actions
+  - Physical-board inspired spacing, framing, and texture treatment
+- Day range selector:
+  - Start date, end date, in-range states, and single-day state
+  - Keyboard/mouse/touch friendly interactions
+  - Month navigation and quick reset actions
+- Integrated notes:
+  - Main monthly notes editor
+  - Quick capture flows (sheet and drawer)
+  - Character count and validation feedback
+- Fully responsive:
+  - Desktop uses segmented composition with side navigation and resizable workspace
+  - Mobile preserves all core interactions via drawer/sheet + stacked flow
+- Frontend-only persistence:
+  - Local storage state schema with versioning
+  - Restores month, range, notes, reminders, and view settings
 
-- A wall calendar aesthetic with a hero image as the visual anchor
-- Day range selection with clear start, in-range, and end visual states
-- An integrated notes area (monthly notes and/or range-attached notes)
-- Fully responsive behavior across desktop and mobile layouts
+## Design-System Integration
 
-This repository is intentionally frontend-only.
+All primitives in components/ui are actively integrated into the product experience:
 
-## Scope and Constraints
+- Avatar, Badge, Breadcrumb, Button, Calendar, Card
+- Checkbox, Collapsible, Combobox, Command, Context Menu
+- Dialog, Direction, Drawer, Dropdown Menu, Empty
+- Field, Input Group, Input, Label, Menubar, Radio Group
+- Resizable, Scroll Area, Select, Separator, Sheet, Sidebar
+- Skeleton, Slider, Sonner Toaster, Spinner, Tabs, Textarea, Toggle, Tooltip
 
-- Frontend only: no backend, no API, no database
-- Persistence (if used): client-side only (`localStorage`, `sessionStorage`, or static data)
-- Architecture preference: React Server Component first
-- Keep client components minimal and isolated to interactive concerns
+The implementation uses the tokenized design system defined in app/globals.css for color, radius, spacing, typography, and surface behavior.
 
-## Tech Stack
+## Architecture Notes
 
-- Next.js 16 (App Router)
-- React 19
-- TypeScript
-- Ultracite/Biome for formatting and linting
+- App Router + RSC-first composition
+- Interactive calendar shell isolated in a client component
+- Shared UI primitives from local shadcn layer
+- Theme-aware notifications through design-system toaster
 
-## Development
-
-Install dependencies and run locally:
+## Run Locally
 
 ```bash
 bun install
 bun run dev
 ```
 
-Then open `http://localhost:3000`.
+Open: http://localhost:3000
 
-### Quality Commands
+## Quality Gates
 
 ```bash
 bun run check
@@ -47,43 +60,18 @@ bun run lint
 bun run format
 ```
 
-## Expected UX Behaviors
+Current status: bun run check passes.
 
-- Smooth and obvious date-range interaction
-- Accessible focus and keyboard navigation states
-- Touch-friendly controls on small screens
-- Responsive layout:
-- Desktop: segmented or side-by-side composition
-- Mobile: stacked layout without feature loss
+## Submission Links
 
-## Submission Checklist
+- Source repository: ADD_PUBLIC_REPO_LINK
+- Video demo (required): ADD_VIDEO_LINK
+- Live demo (optional): ADD_DEPLOYED_LINK
 
-Fill these before submission:
+## Recommended Video Walkthrough
 
-- Source repository: `ADD_PUBLIC_REPO_LINK`
-- Video demo (required): `ADD_VIDEO_LINK`
-- Live demo (optional): `ADD_DEPLOYED_LINK`
-
-Video demo must show:
-
-- Date range selection (start, end, and in-between states)
-- Notes feature in action
-- Responsive behavior on desktop and mobile viewport sizes
-
-## Project Structure
-
-```text
-app/
-  globals.css
-  layout.tsx
-  page.tsx
-public/
-AGENTS.md
-README.md
-```
-
-## Notes for Reviewers
-
-- Prioritize evaluation of component architecture, UI execution quality, and interaction design
-- Review state handling, responsiveness, accessibility, and code clarity
-- No backend behavior is expected for this challenge
+1. Show hero + wall calendar composition on desktop.
+2. Demonstrate date range selection (start, end, in-between).
+3. Demonstrate notes editing, quick capture, and persistence.
+4. Demonstrate mobile viewport usability.
+5. Demonstrate advanced controls (command palette, menu actions, sheet/drawer).
