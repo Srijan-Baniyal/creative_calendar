@@ -238,23 +238,16 @@
   animation: today-pulse 3s ease-in-out infinite;
 }
 
-/* Custom scrollbar */
+/* Hide scrollbar completely */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  display: none;
+  width: 0;
+  height: 0;
 }
 
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-::-webkit-scrollbar-thumb {
-  background: oklch(0.7 0.01 55);
-  border-radius: 3px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: oklch(0.6 0.01 55);
+* {
+  -ms-overflow-style: none; /* IE and Edge */
+  scrollbar-width: none; /* Firefox */
 }
 
 /* Smooth transitions */
@@ -264,5 +257,15 @@
 
 /* Selection color */
 ::selection {
+  color: var(--foreground);
   background: oklch(0.52 0.16 250 / 0.18);
+}
+
+/* Hide sidebar UI globally */
+[data-slot="sidebar"],
+[data-slot="sidebar-gap"],
+[data-slot="sidebar-container"],
+[data-slot="sidebar-trigger"],
+[data-slot="sidebar-rail"] {
+  display: none !important;
 }

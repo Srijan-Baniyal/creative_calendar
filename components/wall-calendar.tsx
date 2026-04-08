@@ -37,7 +37,7 @@ const MONTHS = [
 
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const SPIRAL_BINDING_KEYS = Array.from(
-  { length: 15 },
+  { length: 20 },
   (_, value) => `spiral-${value + 1}`
 );
 
@@ -159,7 +159,11 @@ export function WallCalendar() {
   };
 
   const getDateKey = (date: Date): string => {
-    return date.toISOString().split("T")[0];
+    const yearPart = date.getFullYear();
+    const monthPart = `${date.getMonth() + 1}`.padStart(2, "0");
+    const dayPart = `${date.getDate()}`.padStart(2, "0");
+
+    return `${yearPart}-${monthPart}-${dayPart}`;
   };
 
   const getHoliday = (date: Date): string | undefined => {
@@ -184,12 +188,12 @@ export function WallCalendar() {
       const day = previousMonthDays - i;
       days.push(
         <button
-          className="aspect-square rounded-lg p-2 text-center text-muted-foreground/40 transition-colors hover:bg-muted/30"
+          className="aspect-square min-h-11 rounded-md p-1 text-center text-muted-foreground/40 transition-colors hover:bg-muted/30 sm:rounded-lg sm:p-2"
           disabled
           key={`prev-${day}`}
           type="button"
         >
-          <span className="text-sm">{day}</span>
+          <span className="text-xs sm:text-sm">{day}</span>
         </button>
       );
     }
@@ -206,10 +210,11 @@ export function WallCalendar() {
 
       days.push(
         <button
+          aria-label={`${MONTHS[month]} ${day}, ${year}`}
           className={cn(
-            "group relative aspect-square rounded-lg p-2 text-center transition-all duration-200",
-            "hover:scale-105 hover:shadow-md",
-            isToday && "ring-2 ring-primary",
+            "group relative aspect-square min-h-11 rounded-md p-1 text-center transition-colors duration-200 sm:rounded-lg sm:p-2 sm:transition-all",
+            "sm:hover:scale-[1.03] sm:hover:shadow-md",
+            isToday && "ring-1 ring-primary sm:ring-2",
             inRange && !isStart && !isEnd && "bg-primary/10",
             (isStart || isEnd) &&
               "bg-primary font-semibold text-primary-foreground",
@@ -222,11 +227,14 @@ export function WallCalendar() {
           onMouseLeave={() => setHoveredDate(null)}
           type="button"
         >
-          <span className="block text-sm">{day}</span>
+          <span className="block text-xs sm:text-sm">{day}</span>
           {holiday && (
-            <span className="absolute bottom-0.5 left-1/2 -translate-x-1/2 whitespace-nowrap rounded bg-accent px-1 text-[8px] text-accent-foreground opacity-0 transition-opacity group-hover:opacity-100">
-              {holiday}
-            </span>
+            <>
+              <span className="absolute right-1.5 bottom-1.5 h-1.5 w-1.5 rounded-full bg-accent sm:hidden" />
+              <span className="absolute bottom-0.5 left-1/2 hidden -translate-x-1/2 whitespace-nowrap rounded bg-accent px-1 text-[8px] text-accent-foreground opacity-0 transition-opacity group-hover:opacity-100 sm:block">
+                {holiday}
+              </span>
+            </>
           )}
         </button>
       );
@@ -237,12 +245,12 @@ export function WallCalendar() {
     for (let day = 1; day <= remainingDays; day++) {
       days.push(
         <button
-          className="aspect-square rounded-lg p-2 text-center text-muted-foreground/40 transition-colors hover:bg-muted/30"
+          className="aspect-square min-h-11 rounded-md p-1 text-center text-muted-foreground/40 transition-colors hover:bg-muted/30 sm:rounded-lg sm:p-2"
           disabled
           key={`next-${day}`}
           type="button"
         >
-          <span className="text-sm">{day}</span>
+          <span className="text-xs sm:text-sm">{day}</span>
         </button>
       );
     }
@@ -261,21 +269,24 @@ export function WallCalendar() {
   };
 
   return (
-    <div className="min-h-screen w-full bg-linear-to-br from-background via-muted/20 to-background p-4 md:p-8">
+    <div className="min-h-screen w-full bg-[radial-gradient(circle_at_top,hsl(var(--muted))_0%,hsl(var(--background))_45%,hsl(var(--background))_100%)] p-2 sm:p-4 md:p-8">
       <div className="mx-auto max-w-7xl">
-        <Card className="overflow-hidden border-2 shadow-2xl">
+        <Card className="overflow-hidden border shadow-xl md:shadow-2xl">
           {/* Spiral binding decoration */}
-          <div className="flex h-8 items-center justify-center gap-3 border-b bg-linear-to-b from-muted to-card">
-            {SPIRAL_BINDING_KEYS.map((bindingKey) => (
+          <div className="flex h-7 items-center justify-center gap-1.5 border-b bg-linear-to-b from-muted to-card sm:h-8 sm:gap-3">
+            {SPIRAL_BINDING_KEYS.map((bindingKey, index) => (
               <div
-                className="h-5 w-3 rounded-full border-2 border-muted-foreground/30 bg-card"
+                className={cn(
+                  "h-4 w-2.5 rounded-full border-2 border-muted-foreground/30 bg-card sm:h-5 sm:w-3",
+                  index >= 12 && "hidden sm:block"
+                )}
                 key={bindingKey}
               />
             ))}
           </div>
 
           {/* Hero Image Section */}
-          <div className="relative h-64 overflow-hidden md:h-80 lg:h-96">
+          <div className="relative h-44 overflow-hidden sm:h-56 md:h-80 lg:h-96">
             <Image
               alt="Calendar hero"
               className="h-full w-full object-cover"
@@ -285,9 +296,9 @@ export function WallCalendar() {
               src="/calendar-hero.jpg"
             />
             {/* Geometric overlay */}
-            <div className="absolute inset-0 bg-linear-to-br from-transparent via-transparent to-primary/90" />
+            <div className="absolute inset-0 bg-linear-to-t from-primary/85 via-primary/30 to-transparent" />
             <svg
-              className="absolute bottom-0 left-0 h-32 w-full"
+              className="absolute bottom-0 left-0 h-24 w-full sm:h-28 md:h-32"
               preserveAspectRatio="none"
               viewBox="0 0 1200 200"
             >
@@ -300,20 +311,20 @@ export function WallCalendar() {
             </svg>
 
             {/* Month and Year */}
-            <div className="absolute right-8 bottom-8 text-right">
-              <h2 className="font-bold text-5xl text-primary-foreground tracking-tight md:text-6xl">
+            <div className="absolute right-4 bottom-4 text-right sm:right-8 sm:bottom-8">
+              <h2 className="font-bold text-3xl text-primary-foreground tracking-tight sm:text-5xl md:text-6xl">
                 {year}
               </h2>
-              <h3 className="font-semibold text-3xl text-primary-foreground/90 uppercase tracking-wide md:text-4xl">
+              <h3 className="font-semibold text-lg text-primary-foreground/90 uppercase tracking-wide sm:text-3xl md:text-4xl">
                 {MONTHS[month]}
               </h3>
             </div>
           </div>
 
           {/* Calendar Content */}
-          <div className="grid gap-0 lg:grid-cols-[280px,1fr]">
+          <div className="grid gap-0 lg:grid-cols-[minmax(260px,320px),1fr]">
             {/* Notes Section */}
-            <div className="space-y-4 border-b bg-card p-6 lg:border-r lg:border-b-0">
+            <div className="order-2 space-y-4 border-t bg-card/95 p-4 sm:p-6 lg:order-1 lg:border-t-0 lg:border-r">
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <h4 className="font-semibold text-foreground text-sm uppercase tracking-wide">
@@ -321,7 +332,7 @@ export function WallCalendar() {
                   </h4>
                   {(selectedRange.start || selectedRange.end) && (
                     <Button
-                      className="h-6 px-2"
+                      className="h-8 px-2 sm:h-6"
                       onClick={clearSelection}
                       size="sm"
                       variant="ghost"
@@ -337,22 +348,22 @@ export function WallCalendar() {
 
               <div className="space-y-2">
                 <Textarea
-                  className="min-h-24 resize-none text-sm"
+                  className="min-h-20 resize-none text-sm sm:min-h-24"
                   onChange={(e) => setCurrentNote(e.target.value)}
                   placeholder="Add a note..."
                   value={currentNote}
                 />
-                <Button className="w-full" onClick={addNote} size="sm">
+                <Button className="h-10 w-full" onClick={addNote} size="sm">
                   Add Note
                 </Button>
               </div>
 
-              <div className="max-h-64 space-y-2 overflow-y-auto">
+              <div className="max-h-60 space-y-2 overflow-y-auto pr-1 sm:max-h-72 lg:max-h-120">
                 {notes.map((note) => (
                   <Card className="group relative p-3" key={note.id}>
                     <button
                       aria-label="Delete note"
-                      className="absolute top-2 right-2 opacity-0 transition-opacity group-hover:opacity-100"
+                      className="absolute top-2 right-2 opacity-70 transition-opacity md:opacity-0 md:group-hover:opacity-100"
                       onClick={() => deleteNote(note.id)}
                       type="button"
                     >
@@ -361,29 +372,29 @@ export function WallCalendar() {
                     <p className="mb-1 text-muted-foreground text-xs">
                       {getNoteDateLabel(note)}
                     </p>
-                    <p className="pr-6 text-sm">{note.text}</p>
+                    <p className="pr-6 text-sm leading-relaxed">{note.text}</p>
                   </Card>
                 ))}
               </div>
             </div>
 
             {/* Calendar Grid */}
-            <div className="p-6 md:p-8">
+            <div className="order-1 p-3 sm:p-5 md:p-8 lg:order-2">
               {/* Month Navigation */}
-              <div className="mb-6 flex items-center justify-between">
+              <div className="mb-4 flex items-center gap-2 sm:mb-6">
                 <Button
-                  className="hover:bg-muted"
+                  className="h-10 w-10 rounded-full p-0 hover:bg-muted"
                   onClick={() => navigateMonth("prev")}
                   size="sm"
                   variant="ghost"
                 >
                   <ChevronLeft className="h-5 w-5" />
                 </Button>
-                <h3 className="font-semibold text-lg">
+                <h3 className="flex-1 text-center font-semibold text-base tracking-wide sm:text-lg">
                   {MONTHS[month]} {year}
                 </h3>
                 <Button
-                  className="hover:bg-muted"
+                  className="h-10 w-10 rounded-full p-0 hover:bg-muted"
                   onClick={() => navigateMonth("next")}
                   size="sm"
                   variant="ghost"
@@ -393,10 +404,10 @@ export function WallCalendar() {
               </div>
 
               {/* Days of week */}
-              <div className="mb-2 grid grid-cols-7 gap-1">
+              <div className="mb-2 grid grid-cols-7 gap-0.5 sm:gap-1">
                 {DAYS.map((day) => (
                   <div
-                    className="py-2 text-center font-semibold text-muted-foreground text-xs uppercase"
+                    className="py-1.5 text-center font-semibold text-[10px] text-muted-foreground uppercase sm:py-2 sm:text-xs"
                     key={day}
                   >
                     {day}
@@ -405,22 +416,22 @@ export function WallCalendar() {
               </div>
 
               {/* Calendar days */}
-              <div className="grid grid-cols-7 gap-1">
+              <div className="grid grid-cols-7 gap-0.5 sm:gap-1">
                 {renderCalendarDays()}
               </div>
 
               {/* Legend */}
-              <div className="mt-6 flex flex-wrap gap-4 text-muted-foreground text-xs">
+              <div className="mt-5 flex flex-wrap gap-x-4 gap-y-2 text-[11px] text-muted-foreground sm:mt-6 sm:text-xs">
                 <div className="flex items-center gap-2">
-                  <div className="h-4 w-4 rounded bg-primary" />
+                  <div className="h-3.5 w-3.5 rounded bg-primary sm:h-4 sm:w-4" />
                   <span>Selected</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <div className="h-4 w-4 rounded border border-primary/20 bg-primary/10" />
+                  <div className="h-3.5 w-3.5 rounded border border-primary/20 bg-primary/10 sm:h-4 sm:w-4" />
                   <span>In Range</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <div className="h-4 w-4 rounded ring-2 ring-primary" />
+                  <div className="h-3.5 w-3.5 rounded ring-2 ring-primary sm:h-4 sm:w-4" />
                   <span>Today</span>
                 </div>
               </div>

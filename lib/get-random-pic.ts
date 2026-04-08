@@ -20,26 +20,29 @@ export const MONTH_NAMES = [
   "DECEMBER",
 ] as const;
 
-const ARTWORK_BY_MONTH: Partial<Record<number, string>> = {
-  0: "/January.png",
-  1: "/Febuary.png",
-  3: "/April.png",
-  5: "/June.png",
-  7: "/August.png",
+type MonthName = (typeof MONTH_NAMES)[number];
+
+const ARTWORK_BY_MONTH_NAME: Record<MonthName, string> = {
+  JANUARY: "/January.png",
+  FEBRUARY: "/Febuary.png",
+  MARCH: "/March.png",
+  APRIL: "/April.png",
+  MAY: "/May.png",
+  JUNE: "/June.png",
+  JULY: "/July.png",
+  AUGUST: "/August.png",
+  SEPTEMBER: "/September.png",
+  OCTOBER: "/October.png",
+  NOVEMBER: "/November.png",
+  DECEMBER: "/December.png",
 };
 
 const DEFAULT_ARTWORK = "/January.png";
 
 export function getArtworkSourceForMonth(monthIndex: number): string {
-  for (const offset of Array.from({ length: 12 }, (_, value) => value)) {
-    const candidateMonth = (monthIndex - offset + 12) % 12;
-    const source = ARTWORK_BY_MONTH[candidateMonth];
-    if (source) {
-      return source;
-    }
-  }
-
-  return DEFAULT_ARTWORK;
+  const normalizedMonthIndex = ((monthIndex % 12) + 12) % 12;
+  const monthName = MONTH_NAMES[normalizedMonthIndex] ?? MONTH_NAMES[0];
+  return ARTWORK_BY_MONTH_NAME[monthName] ?? DEFAULT_ARTWORK;
 }
 
 export function GetRandomPic(): CalendarArtwork {

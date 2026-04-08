@@ -1,5 +1,6 @@
 "use client";
 
+import { format } from "date-fns";
 import {
   AlertCircle,
   Calendar as CalendarIcon,
@@ -10,10 +11,12 @@ import {
   Clock,
   Edit2,
   GripVertical,
+  LineChart,
   MapPin,
   Moon,
   Plus,
   Sparkles,
+  StickyNote,
   Sun,
   Tag as TagIcon,
   Trash2,
@@ -21,7 +24,7 @@ import {
 import Image from "next/image";
 import { useTheme } from "next-themes";
 import { useEffect, useMemo, useState } from "react";
-import type { DateRange } from "react-day-picker";
+import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -42,6 +45,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { Progress } from "@/components/ui/progress";
 import {
   Select,
   SelectContent,
@@ -57,7 +61,8 @@ import { cn } from "@/lib/utils";
 
 type NoteStatus = "todo" | "in-progress" | "done";
 type NotePriority = "low" | "medium" | "high";
-type CalendarView = "month" | "kanban";
+type CalendarView = "month" | "kanban" | "analytics";
+type RecurringType = "none" | "daily" | "weekly" | "monthly" | "yearly";
 
 interface Note {
   color: string;
@@ -66,9 +71,11 @@ interface Note {
   id: string;
   location?: string;
   priority: NotePriority;
+  recurring?: RecurringType;
   startDate: string;
   status: NoteStatus;
   tags: string[];
+  time?: string;
   title: string;
 }
 
@@ -77,24 +84,62 @@ interface NormalizedDateRange {
   to: Date;
 }
 
-interface FormErrors {
-  color?: string;
-  description?: string;
-  location?: string;
-  priority?: string;
-  status?: string;
-  tags?: string;
-  title?: string;
+export interface NoteFormValues {
+  color: string;
+  description: string;
+  formEndDate: string;
+  formStartDate: string;
+  location: string;
+  priority: NotePriority;
+  recurring: RecurringType;
+  status: NoteStatus;
+  tags: string;
+  time: string;
+  title: string;
 }
 
-const CALENDAR_VIEWS = ["month", "kanban"] as const;
+const CALENDAR_VIEWS = ["month", "kanban", "analytics"] as const;
 const NOTE_PRIORITIES = ["low", "medium", "high"] as const;
 const NOTE_STATUSES = ["todo", "in-progress", "done"] as const;
+const RECURRING_TYPES = [
+  "none",
+  "daily",
+  "weekly",
+  "monthly",
+  "yearly",
+] as const;
 const SPIRAL_RING_MARKERS = Array.from({ length: 20 }, (_, i) => i + 1);
 const DATE_KEY_REGEX = /^(\d{4})-(\d{2})-(\d{2})$/;
+const TIME_VALUE_REGEX = /^([01]\d|2[0-3]):([0-5]\d)$/;
+const VIEW_LABELS: Record<CalendarView, string> = {
+  month: "Calendar",
+  kanban: "Kanban",
+  analytics: "Analytics",
+};
+
+const TOAST_STYLE_SUCCESS = {
+  background: "#059669",
+  border: "1px solid #047857",
+  color: "#ecfdf5",
+};
+
+const TOAST_STYLE_INFO = {
+  background: "#2563eb",
+  border: "1px solid #1d4ed8",
+  color: "#eff6ff",
+};
+
+const TOAST_STYLE_WARNING = {
+  background: "#d97706",
+  border: "1px solid #b45309",
+  color: "#fffbeb",
+};
 
 const isCalendarView = (value: string): value is CalendarView =>
   CALENDAR_VIEWS.includes(value as CalendarView);
+
+const isRecurringType = (value: unknown): value is RecurringType =>
+  typeof value === "string" && RECURRING_TYPES.includes(value as RecurringType);
 
 const isNotePriority = (value: unknown): value is NotePriority =>
   typeof value === "string" && NOTE_PRIORITIES.includes(value as NotePriority);
@@ -202,6 +247,12 @@ const PRIORITY_CONFIG = {
     color: "bg-rose-50 text-rose-700 border-rose-200",
     icon: Sparkles,
   },
+};
+
+const PRIORITY_PROGRESS_CLASS: Record<NotePriority, string> = {
+  low: "bg-emerald-500 dark:bg-emerald-400",
+  medium: "bg-amber-500 dark:bg-amber-400",
+  high: "bg-rose-500 dark:bg-rose-400",
 };
 
 const STATUS_CONFIG = {
@@ -336,6 +387,46 @@ const MONTH_QUOTES = [
   "Peace and wonder.",
 ];
 
+type TimeInputMode = "none" | "12h" | "24h";
+type TimeMeridiem = "AM" | "PM";
+
+const TIME_MODE_NONE = "none";
+const TIME_HOUR_OPTIONS_12 = Array.from({ length: 12 }, (_, index) =>
+  `${index + 1}`.padStart(2, "0")
+);
+const TIME_HOUR_OPTIONS_24 = Array.from({ length: 24 }, (_, index) =>
+  `${index}`.padStart(2, "0")
+);
+const TIME_MINUTE_OPTIONS = Array.from({ length: 60 }, (_, index) =>
+  `${index}`.padStart(2, "0")
+);
+
+const formatStoredTime = (hour24: number, minute: number): string =>
+  `${`${hour24}`.padStart(2, "0")}:${`${minute}`.padStart(2, "0")}`;
+
+const parseStoredTime = (value: string) => {
+  const match = value.match(TIME_VALUE_REGEX);
+  const parsedHour24 = match ? Number(match[1]) : 9;
+  const parsedMinute = match ? Number(match[2]) : 0;
+  const meridiem: TimeMeridiem = parsedHour24 >= 12 ? "PM" : "AM";
+  const hour12Number = parsedHour24 % 12 || 12;
+
+  return {
+    hour12Number,
+    hour12String: `${hour12Number}`.padStart(2, "0"),
+    hour24: parsedHour24,
+    hour24String: `${parsedHour24}`.padStart(2, "0"),
+    meridiem,
+    minute: parsedMinute,
+    minuteString: `${parsedMinute}`.padStart(2, "0"),
+  };
+};
+
+const toHour24From12 = (hour12: number, meridiem: TimeMeridiem): number => {
+  const normalizedHour = hour12 % 12;
+  return meridiem === "PM" ? normalizedHour + 12 : normalizedHour;
+};
+
 // Get a stable date for SSR - this ensures server and client render the same initial date
 const getInitialDate = () => {
   // Use a fixed date string format that will be the same on server and client
@@ -352,25 +443,103 @@ export function PremiumCalendar() {
   const [editingNote, setEditingNote] = useState<Note | null>(null);
   const [view, setView] = useState<CalendarView>("month");
   const [draggedNote, setDraggedNote] = useState<Note | null>(null);
+  const [showWeekNumbers, setShowWeekNumbers] = useState(true);
+  const [timeInputMode, setTimeInputMode] =
+    useState<TimeInputMode>(TIME_MODE_NONE);
   const { theme, setTheme } = useTheme();
 
-  // Form state
-  const [noteTitle, setNoteTitle] = useState("");
-  const [noteDescription, setNoteDescription] = useState("");
-  const [noteColor, setNoteColor] = useState(NOTE_COLORS[1].value);
-  const [notePriority, setNotePriority] = useState<NotePriority>("low");
-  const [noteTags, setNoteTags] = useState("");
-  const [noteLocation, setNoteLocation] = useState("");
-  const [noteStatus, setNoteStatus] = useState<NoteStatus>("todo");
-  const [formStartDate, setFormStartDate] = useState("");
-  const [formEndDate, setFormEndDate] = useState("");
-  const [dateFieldError, setDateFieldError] = useState("");
-  const [formErrors, setFormErrors] = useState<FormErrors>({});
+  // Unified Form Hook State
+  const form = useForm<NoteFormValues>({
+    defaultValues: {
+      title: "",
+      description: "",
+      color: NOTE_COLORS[1].value,
+      priority: "low",
+      tags: "",
+      location: "",
+      time: "",
+      recurring: "none",
+      status: "todo",
+      formStartDate: "",
+      formEndDate: "",
+    },
+  });
 
-  // Calendar date selection state
-  const [calendarDateRange, setCalendarDateRange] = useState<
-    DateRange | undefined
-  >();
+  const {
+    register,
+    handleSubmit,
+    watch,
+    setValue,
+    formState: { errors },
+    reset,
+  } = form;
+
+  const watchedTime = watch("time");
+  const resolvedTimeMode: TimeInputMode = watchedTime
+    ? timeInputMode
+    : TIME_MODE_NONE;
+  const parsedStoredTime = useMemo(
+    () => parseStoredTime(watchedTime),
+    [watchedTime]
+  );
+
+  const setStoredTime = (hour24: number, minute: number) => {
+    setValue("time", formatStoredTime(hour24, minute));
+  };
+
+  const handleTimeModeChange = (nextMode: TimeInputMode) => {
+    setTimeInputMode(nextMode);
+
+    if (nextMode === TIME_MODE_NONE) {
+      setValue("time", "");
+      return;
+    }
+
+    if (!watchedTime) {
+      setStoredTime(9, 0);
+    }
+  };
+
+  const handleTimeHourChange = (hourValue: string) => {
+    if (resolvedTimeMode === TIME_MODE_NONE) {
+      return;
+    }
+
+    if (resolvedTimeMode === "24h") {
+      setStoredTime(Number(hourValue), parsedStoredTime.minute);
+      return;
+    }
+
+    const hour24 = toHour24From12(Number(hourValue), parsedStoredTime.meridiem);
+    setStoredTime(hour24, parsedStoredTime.minute);
+  };
+
+  const handleTimeMinuteChange = (minuteValue: string) => {
+    if (resolvedTimeMode === TIME_MODE_NONE) {
+      return;
+    }
+
+    setStoredTime(parsedStoredTime.hour24, Number(minuteValue));
+  };
+
+  const handleTimeMeridiemChange = (nextMeridiem: TimeMeridiem) => {
+    const hour24 = toHour24From12(parsedStoredTime.hour12Number, nextMeridiem);
+    setStoredTime(hour24, parsedStoredTime.minute);
+  };
+
+  const showSuccessToast = (title: string, description?: string) => {
+    toast.success(title, {
+      description,
+      style: TOAST_STYLE_SUCCESS,
+    });
+  };
+
+  const showInfoToast = (title: string, description?: string) => {
+    toast(title, {
+      description,
+      style: TOAST_STYLE_INFO,
+    });
+  };
 
   // Today's date - only accurate after mount
   const today = useMemo(() => {
@@ -382,7 +551,97 @@ export function PremiumCalendar() {
   // Set mounted state
   useEffect(() => {
     setMounted(true);
+    // Request notification permission natively
+    if ("Notification" in window && Notification.permission === "default") {
+      Notification.requestPermission();
+    }
   }, []);
+
+  // Smart Reminders Notification Engine
+  useEffect(() => {
+    if (
+      !mounted ||
+      typeof window === "undefined" ||
+      !("Notification" in window)
+    ) {
+      return;
+    }
+
+    // Track already notified notes structurally to prevent spam
+    const notifiedIds = new Set<string>();
+
+    const checkReminders = () => {
+      const now = new Date();
+      const timeStr = format(now, "HH:mm");
+
+      for (const note of notes) {
+        if (!note.time || note.status === "done" || notifiedIds.has(note.id)) {
+          continue;
+        }
+
+        // Very basic current-day check for demo purposes
+        // Real logic would use getNotesForDate(now).some() mapping
+        const currentYMD = format(now, "yyyy-MM-dd");
+        const isOccurringToday =
+          note.startDate <= currentYMD && note.endDate >= currentYMD;
+
+        if (isOccurringToday && timeStr === note.time) {
+          notifiedIds.add(note.id);
+
+          // Natively synthesized premium Audio Context ping
+          try {
+            type LegacyAudioWindow = Window & {
+              webkitAudioContext?: typeof AudioContext;
+            };
+            const legacyAudioContext = (window as LegacyAudioWindow)
+              .webkitAudioContext;
+            const AudioContextCtor = window.AudioContext ?? legacyAudioContext;
+
+            if (AudioContextCtor) {
+              const ctx = new AudioContextCtor();
+              const osc = ctx.createOscillator();
+              const gain = ctx.createGain();
+              osc.connect(gain);
+              gain.connect(ctx.destination);
+              osc.type = "sine";
+              osc.frequency.setValueAtTime(880, ctx.currentTime); // A5 note
+              osc.frequency.exponentialRampToValueAtTime(
+                1760,
+                ctx.currentTime + 0.1
+              );
+              gain.gain.setValueAtTime(0, ctx.currentTime);
+              gain.gain.linearRampToValueAtTime(0.3, ctx.currentTime + 0.05);
+              gain.gain.exponentialRampToValueAtTime(
+                0.001,
+                ctx.currentTime + 0.4
+              );
+              osc.start();
+              osc.stop(ctx.currentTime + 0.5);
+            }
+          } catch {
+            // Silently catch audio restrictions
+          }
+
+          if (Notification.permission === "granted") {
+            new Notification(`Reminder: ${note.title}`, {
+              body: note.description,
+              icon: "/favicon.ico", // standard fallback
+            });
+          }
+
+          toast("Reminder Event Occurred", {
+            description: `[${note.time}] ${note.title}`,
+            icon: <Clock className="h-4 w-4" />,
+            style: TOAST_STYLE_WARNING,
+          });
+        }
+      }
+    };
+
+    // Interval loop
+    const interval = setInterval(checkReminders, 15_000); // Check every 15s
+    return () => clearInterval(interval);
+  }, [mounted, notes]);
 
   // Load notes from localStorage
   useEffect(() => {
@@ -420,6 +679,10 @@ export function PremiumCalendar() {
               : "low",
             tags: getStringArray(storedNote.tags),
             location: getStringOrEmpty(storedNote.location),
+            time: getStringOrEmpty(storedNote.time),
+            recurring: isRecurringType(storedNote.recurring)
+              ? storedNote.recurring
+              : "none",
             status: isNoteStatus(storedNote.status)
               ? storedNote.status
               : "todo",
@@ -451,41 +714,22 @@ export function PremiumCalendar() {
     const normalized = normalizeDateRange(from, to);
     const endDate = normalized.to;
 
-    setCalendarDateRange(normalized);
-    setFormStartDate(formatDateKey(normalized.from));
-    setFormEndDate(formatDateKey(endDate));
+    setValue("formStartDate", formatDateKey(normalized.from));
+    setValue("formEndDate", formatDateKey(endDate));
+
     if (normalized.from.getTime() === endDate.getTime()) {
       setSelectedDates([normalized.from]);
     } else {
       setSelectedDates([normalized.from, endDate]);
     }
-    setDateFieldError("");
-  };
-
-  const clearFormError = (field: keyof FormErrors) => {
-    setFormErrors((previous) => {
-      if (!previous[field]) {
-        return previous;
-      }
-
-      const nextErrors = { ...previous };
-      delete nextErrors[field];
-      return nextErrors;
-    });
   };
 
   const handleStartDatePick = (selectedDate: Date | undefined) => {
-    if (!selectedDate) {
-      setDateFieldError("Pick a valid first date.");
+    if (!selectedDate || isPastDate(selectedDate)) {
       return;
     }
 
-    if (isPastDate(selectedDate)) {
-      setDateFieldError("First date cannot be in the past.");
-      return;
-    }
-
-    const parsedEnd = parseDateKey(formEndDate);
+    const parsedEnd = parseDateKey(watch("formEndDate"));
     const endCandidate =
       parsedEnd && !isPastDate(parsedEnd) ? parsedEnd : selectedDate;
 
@@ -493,17 +737,11 @@ export function PremiumCalendar() {
   };
 
   const handleEndDatePick = (selectedDate: Date | undefined) => {
-    if (!selectedDate) {
-      setDateFieldError("Pick a valid last date.");
+    if (!selectedDate || isPastDate(selectedDate)) {
       return;
     }
 
-    if (isPastDate(selectedDate)) {
-      setDateFieldError("Last date cannot be in the past.");
-      return;
-    }
-
-    const parsedStart = parseDateKey(formStartDate);
+    const parsedStart = parseDateKey(watch("formStartDate"));
     if (!parsedStart) {
       syncDialogDateFields(selectedDate, selectedDate);
       return;
@@ -542,98 +780,51 @@ export function PremiumCalendar() {
   const openNoteDialog = (note?: Note) => {
     if (note) {
       setEditingNote(note);
-      setNoteTitle(note.title);
-      setNoteDescription(note.description);
-      setNoteColor(note.color);
-      setNotePriority(note.priority);
-      setNoteTags((note.tags || []).join(", "));
-      setNoteLocation(note.location || "");
-      setNoteStatus(note.status || "todo");
+      reset({
+        title: note.title,
+        description: note.description,
+        color: note.color,
+        priority: note.priority,
+        tags: (note.tags || []).join(", "),
+        location: note.location || "",
+        time: note.time || "",
+        recurring: note.recurring || "none",
+        status: note.status || "todo",
+        formStartDate: note.startDate,
+        formEndDate: note.endDate,
+      });
       const start = parseDateKey(note.startDate) ?? today;
       const end = parseDateKey(note.endDate) ?? start;
       syncDialogDateFields(start, end);
-    } else if (selectedDates.length === 2) {
-      // Use selected dates if available
-      syncDialogDateFields(selectedDates[0], selectedDates[1]);
-    } else if (selectedDates.length === 1) {
-      syncDialogDateFields(selectedDates[0], selectedDates[0]);
     } else {
-      syncDialogDateFields(today, today);
+      reset(); // Back to defaults
+      setEditingNote(null);
+      if (selectedDates.length === 2) {
+        syncDialogDateFields(selectedDates[0], selectedDates[1]);
+      } else if (selectedDates.length === 1) {
+        syncDialogDateFields(selectedDates[0], selectedDates[0]);
+      } else {
+        syncDialogDateFields(today, today);
+      }
     }
+    form.clearErrors();
     setIsDialogOpen(true);
   };
 
   const resetForm = () => {
-    setNoteTitle("");
-    setNoteDescription("");
-    setNoteColor(NOTE_COLORS[1].value);
-    setNotePriority("low");
-    setNoteTags("");
-    setNoteLocation("");
-    setNoteStatus("todo");
-    setFormStartDate("");
-    setFormEndDate("");
-    setDateFieldError("");
-    setFormErrors({});
+    reset();
     setEditingNote(null);
-    setCalendarDateRange(undefined);
     setSelectedDates([]);
   };
 
-  const handleSaveNote = () => {
-    const trimmedTitle = noteTitle.trim();
-    const trimmedDescription = noteDescription.trim();
-    const trimmedLocation = noteLocation.trim();
-    const parsedTags = parseTagsInput(noteTags);
+  const onSubmit = (data: NoteFormValues) => {
+    const trimmedTitle = data.title.trim();
+    const trimmedDescription = data.description.trim();
+    const trimmedLocation = data.location.trim();
+    const parsedTags = parseTagsInput(data.tags);
 
-    if (!(calendarDateRange?.from && formStartDate && formEndDate)) {
-      setDateFieldError("First and last dates are required.");
-      return;
-    }
-
-    const normalizedRange = normalizeDateRange(
-      calendarDateRange.from,
-      calendarDateRange.to
-    );
-    const normalizedEnd = normalizedRange.to ?? normalizedRange.from;
-
-    const nextFormErrors: FormErrors = {};
-    if (!trimmedTitle) {
-      nextFormErrors.title = "Title is required.";
-    }
-    if (!trimmedDescription) {
-      nextFormErrors.description = "Description is required.";
-    }
-    if (!notePriority) {
-      nextFormErrors.priority = "Priority is required.";
-    }
-    if (!noteStatus) {
-      nextFormErrors.status = "Status is required.";
-    }
-    if (!noteColor) {
-      nextFormErrors.color = "Color selection is required.";
-    }
-    if (!trimmedLocation) {
-      nextFormErrors.location = "Location is required.";
-    }
-    if (parsedTags.length === 0) {
-      nextFormErrors.tags = "At least one tag is required.";
-    }
-
-    if (Object.keys(nextFormErrors).length > 0) {
-      setFormErrors(nextFormErrors);
-      return;
-    }
-
-    setFormErrors({});
-
-    if (isPastDate(normalizedRange.from) || isPastDate(normalizedEnd)) {
-      setDateFieldError("Dates cannot be in the past.");
-      return;
-    }
-
-    const startDate = formatDateKey(normalizedRange.from);
-    const endDate = formatDateKey(normalizedEnd);
+    const startDate = data.formStartDate;
+    const endDate = data.formEndDate;
 
     const newNote: Note = {
       id: editingNote?.id || Date.now().toString(),
@@ -641,23 +832,29 @@ export function PremiumCalendar() {
       description: trimmedDescription,
       startDate,
       endDate,
-      color: noteColor,
-      priority: notePriority,
+      color: data.color,
+      priority: data.priority,
       tags: parsedTags,
       location: trimmedLocation,
-      status: noteStatus,
+      time: data.time.trim() || undefined,
+      recurring: data.recurring === "none" ? undefined : data.recurring,
+      status: data.status,
     };
 
     if (editingNote) {
       setNotes(notes.map((n) => (n.id === editingNote.id ? newNote : n)));
+      showSuccessToast(
+        "Note updated",
+        `${trimmedTitle} was updated successfully.`
+      );
     } else {
       setNotes([...notes, newNote]);
-      toast.success("Note created", {
-        description:
-          startDate === endDate
-            ? `${trimmedTitle} scheduled for ${startDate}.`
-            : `${trimmedTitle} scheduled from ${startDate} to ${endDate}.`,
-      });
+      showSuccessToast(
+        "Note created",
+        startDate === endDate
+          ? `${trimmedTitle} scheduled for ${startDate}.`
+          : `${trimmedTitle} scheduled from ${startDate} to ${endDate}.`
+      );
     }
 
     setIsDialogOpen(false);
@@ -665,32 +862,67 @@ export function PremiumCalendar() {
   };
 
   const handleDeleteNote = (id: string) => {
+    const targetNote = notes.find((note) => note.id === id);
     setNotes(notes.filter((n) => n.id !== id));
+    showSuccessToast(
+      "Note deleted",
+      targetNote
+        ? `${targetNote.title} was removed.`
+        : "The selected note was removed."
+    );
   };
 
   const handleStatusChange = (noteId: string, newStatus: NoteStatus) => {
+    const targetNote = notes.find((note) => note.id === noteId);
+    if (!targetNote) {
+      return;
+    }
+
+    if (targetNote.status === newStatus) {
+      return;
+    }
+
     setNotes(
       notes.map((n) => (n.id === noteId ? { ...n, status: newStatus } : n))
+    );
+    showSuccessToast(
+      "Status updated",
+      `${targetNote.title} moved to ${STATUS_CONFIG[newStatus].label}.`
     );
   };
 
   const previousMonth = () => {
+    const previousDate = new Date(
+      currentDate.getFullYear(),
+      currentDate.getMonth() - 1,
+      1
+    );
+    const previousLabel = format(previousDate, "MMMM yyyy");
     setCurrentDate(
       new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1)
     );
     setSelectedDates([]);
+    showInfoToast(`Showing ${previousLabel}`);
   };
 
   const nextMonth = () => {
+    const nextDate = new Date(
+      currentDate.getFullYear(),
+      currentDate.getMonth() + 1,
+      1
+    );
+    const nextLabel = format(nextDate, "MMMM yyyy");
     setCurrentDate(
       new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1)
     );
     setSelectedDates([]);
+    showInfoToast(`Showing ${nextLabel}`);
   };
 
   const goToToday = () => {
     setCurrentDate(new Date());
     setSelectedDates([]);
+    showInfoToast("Jumped to current month", format(new Date(), "MMMM yyyy"));
   };
 
   const getDaysInMonth = () => {
@@ -721,12 +953,56 @@ export function PremiumCalendar() {
 
   const getNotesForDate = (date: Date) => {
     const dateStr = formatDateKey(date);
-    return notes.filter(
-      (note) =>
-        dateStr >= note.startDate &&
-        dateStr <= note.endDate &&
-        note.status !== "done"
-    );
+    const dateQuery = date.getTime();
+
+    return notes.filter((note) => {
+      if (note.status === "done") {
+        return false;
+      }
+
+      // Standard date range intersection
+      if (dateStr >= note.startDate && dateStr <= note.endDate) {
+        return true;
+      }
+
+      const noteStartObj = parseDateKey(note.startDate);
+      if (!noteStartObj) {
+        return false;
+      }
+
+      const noteStart = noteStartObj.getTime();
+
+      // Recurring logic
+      if (
+        dateQuery < noteStart ||
+        !note.recurring ||
+        note.recurring === "none"
+      ) {
+        return false;
+      }
+
+      const diffTime = Math.abs(dateQuery - noteStart);
+      const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
+
+      if (note.recurring === "daily") {
+        return true;
+      }
+      if (note.recurring === "weekly") {
+        return diffDays % 7 === 0;
+      }
+
+      if (note.recurring === "monthly") {
+        return date.getDate() === noteStartObj.getDate();
+      }
+      if (note.recurring === "yearly") {
+        return (
+          date.getDate() === noteStartObj.getDate() &&
+          date.getMonth() === noteStartObj.getMonth()
+        );
+      }
+
+      return false;
+    });
   };
 
   const getDateKey = (date: Date) => formatDateKey(date);
@@ -735,6 +1011,22 @@ export function PremiumCalendar() {
     date.getMonth() === currentDate.getMonth() &&
     date.getFullYear() === currentDate.getFullYear();
   const getHoliday = (date: Date) => HOLIDAYS[getDateKey(date)];
+
+  const getIsoWeekNumber = (date: Date) => {
+    const dateObj = new Date(date.getTime());
+    dateObj.setHours(0, 0, 0, 0);
+    dateObj.setDate(dateObj.getDate() + 3 - ((dateObj.getDay() + 6) % 7));
+    const week1 = new Date(dateObj.getFullYear(), 0, 4);
+    return (
+      1 +
+      Math.round(
+        ((dateObj.getTime() - week1.getTime()) / 86_400_000 -
+          3 +
+          ((week1.getDay() + 6) % 7)) /
+          7
+      )
+    );
+  };
 
   const isInSelectedRange = (date: Date) => {
     if (selectedDates.length === 0) {
@@ -768,6 +1060,7 @@ export function PremiumCalendar() {
       "in-progress": [],
       done: [],
     };
+
     const sorted = [...notes].sort(
       (a, b) =>
         new Date(a.startDate).getTime() - new Date(b.startDate).getTime()
@@ -780,14 +1073,6 @@ export function PremiumCalendar() {
 
   const getNoteColorConfig = (color: string) =>
     NOTE_COLORS.find((c) => c.value === color) || NOTE_COLORS[1];
-
-  const isSaveDisabled =
-    !(noteTitle.trim() && noteDescription.trim() && noteLocation.trim()) ||
-    parseTagsInput(noteTags).length === 0 ||
-    !calendarDateRange?.from ||
-    !formStartDate ||
-    !formEndDate ||
-    Boolean(dateFieldError);
 
   const getDayContent = (isPast: boolean, dayNotes: Note[]) => {
     if (isPast && dayNotes.length === 0) {
@@ -883,8 +1168,8 @@ export function PremiumCalendar() {
 
   return (
     <TooltipProvider>
-      <div className="calendar-wall min-h-screen p-4 sm:p-8 lg:p-12">
-        <div className="mx-auto max-w-4xl">
+      <div className="calendar-wall min-h-screen overflow-x-hidden p-3 sm:p-8 lg:p-12">
+        <div className="mx-auto max-w-3xl">
           {/* Calendar Container */}
           <div className="calendar-enter relative pt-16 sm:pt-20">
             {/* ── Wall Nail ── */}
@@ -943,21 +1228,25 @@ export function PremiumCalendar() {
 
             <Card className="calendar-paper relative overflow-hidden border-0 shadow-[0_8px_30px_-8px_rgba(0,0,0,0.12),0_25px_55px_-15px_rgba(0,0,0,0.15),0_0_0_1px_rgba(0,0,0,0.04)]">
               {/* ── Spiral Binding ── */}
-              <div className="relative z-10 flex h-10 items-center justify-center gap-5 overflow-visible border-stone-200/60 border-b bg-linear-to-b from-stone-100 via-stone-50 to-transparent dark:border-stone-800/60 dark:from-stone-800/60 dark:via-stone-800/30">
+              <div className="relative z-10 flex h-9 items-center justify-center gap-1.5 overflow-visible border-stone-200/60 border-b bg-linear-to-b from-stone-100 via-stone-50 to-transparent sm:h-10 sm:gap-3 lg:gap-5 dark:border-stone-800/60 dark:from-stone-800/60 dark:via-stone-800/30">
                 {/* Top shadow for depth */}
                 <div className="absolute inset-x-0 top-0 h-px bg-stone-300/30 dark:bg-black/20" />
-                {SPIRAL_RING_MARKERS.map((ring) => (
+                {SPIRAL_RING_MARKERS.map((ring, index) => (
                   <div
-                    className="relative flex flex-col items-center"
+                    className={cn(
+                      "relative flex flex-col items-center",
+                      index >= 12 && "hidden sm:flex",
+                      index >= 16 && "hidden lg:flex"
+                    )}
                     key={ring}
                   >
                     {/* Wire loop protruding above */}
-                    <div className="absolute -top-3.5 h-4 w-3 overflow-visible">
+                    <div className="absolute -top-2.5 h-3 w-2.5 overflow-visible sm:-top-3.5 sm:h-4 sm:w-3">
                       <div className="absolute inset-0 rounded-t-full border-[1.5px] border-stone-400/80 border-b-0 bg-linear-to-b from-stone-300/20 to-transparent" />
                       <div className="spiral-wire-shine absolute top-px left-px h-2.5 w-0.5 rounded-full bg-white/30" />
                     </div>
                     {/* Punch hole with depth */}
-                    <div className="relative h-3.5 w-3.5 rounded-full bg-linear-to-br from-stone-300 to-stone-400 shadow-[inset_0_1px_3px_rgba(0,0,0,0.25),0_0.5px_0_rgba(255,255,255,0.5)] dark:from-stone-800 dark:to-stone-950 dark:shadow-[inset_0_1px_3px_rgba(0,0,0,0.8),0_0.5px_0_rgba(255,255,255,0.1)]">
+                    <div className="relative h-2.5 w-2.5 rounded-full bg-linear-to-br from-stone-300 to-stone-400 shadow-[inset_0_1px_3px_rgba(0,0,0,0.25),0_0.5px_0_rgba(255,255,255,0.5)] sm:h-3.5 sm:w-3.5 dark:from-stone-800 dark:to-stone-950 dark:shadow-[inset_0_1px_3px_rgba(0,0,0,0.8),0_0.5px_0_rgba(255,255,255,0.1)]">
                       <div className="absolute inset-0.75 rounded-full bg-linear-to-br from-stone-100 to-stone-200 shadow-[inset_0_-1px_2px_rgba(0,0,0,0.1)] dark:from-stone-700 dark:to-stone-800 dark:shadow-[inset_0_-1px_2px_rgba(0,0,0,0.5)]" />
                     </div>
                   </div>
@@ -965,7 +1254,7 @@ export function PremiumCalendar() {
               </div>
 
               {/* ── Hero Section ── */}
-              <div className="relative h-40 overflow-hidden border-stone-200/40 border-b bg-linear-to-br from-stone-800 via-stone-700 to-stone-900 sm:h-52 lg:h-60">
+              <div className="relative h-36 overflow-hidden border-stone-200/40 border-b bg-linear-to-br from-stone-800 via-stone-700 to-stone-900 sm:h-48 lg:h-52">
                 <Image
                   alt={`${monthName} calendar artwork`}
                   className="object-cover"
@@ -979,38 +1268,32 @@ export function PremiumCalendar() {
                 <div className="absolute inset-0 bg-linear-to-r from-black/15 to-transparent" />
                 <div className="absolute inset-x-0 bottom-0 h-px bg-white/40" />
 
-                {/* Quote */}
-                <div className="absolute top-6 left-6 sm:top-8 sm:left-10">
-                  <div className="flex items-center gap-3">
-                    <div className="h-px w-6 bg-white/40" />
-                    <p className="font-medium text-[11px] text-white/55 uppercase tracking-[0.35em]">
-                      {monthQuote}
-                    </p>
-                  </div>
-                </div>
-
                 {/* Month + Year display */}
-                <div className="absolute right-6 bottom-8 text-right sm:right-10 sm:bottom-10">
-                  <div className="font-light text-base text-white/60 tracking-[0.2em] sm:text-lg">
+                <div className="absolute right-6 bottom-6 text-right sm:right-8 sm:bottom-8">
+                  <div className="mb-1 font-bold text-lg text-white/90 tracking-[0.2em] drop-shadow-md sm:text-2xl">
                     {yearNum}
                   </div>
-                  <div
-                    className="font-bold font-display text-4xl text-white tracking-tight drop-shadow-[0_2px_12px_rgba(0,0,0,0.3)] sm:text-6xl lg:text-7xl"
-                    style={{ fontFamily: "var(--font-display)" }}
-                  >
+                  <div className="font-bold font-display text-4xl text-white tracking-tight drop-shadow-[0_2px_12px_rgba(0,0,0,0.4)] sm:text-6xl lg:text-7xl">
                     {monthName}
                   </div>
                 </div>
               </div>
 
               {/* ── Main Content ── */}
-              <div className="p-5 sm:p-8 lg:p-10">
+              <div className="p-4 sm:p-6 lg:p-8">
+                {/* Month Quote Ribbon Mobile */}
+                <div className="mb-4 flex items-center justify-center sm:hidden">
+                  <p className="font-medium text-[10px] text-stone-500 uppercase tracking-[0.2em] dark:text-stone-400">
+                    — {monthQuote} —
+                  </p>
+                </div>
+
                 {/* Controls */}
-                <div className="mb-6 flex flex-col items-start justify-between gap-4 sm:mb-8 sm:flex-row sm:items-center">
-                  <div className="flex items-center gap-3">
+                <div className="mb-6 flex flex-wrap items-end justify-between gap-3 lg:mb-8 lg:flex-row lg:items-center lg:gap-4">
+                  <div className="flex w-full items-center gap-3 lg:w-auto">
                     <div className="flex items-center rounded-full bg-stone-100 p-1 dark:bg-stone-800/80">
                       <Button
-                        className="h-9 w-9 rounded-full hover:bg-white dark:hover:bg-stone-700"
+                        className="h-8 w-8 rounded-full hover:bg-white sm:h-9 sm:w-9 dark:hover:bg-stone-700"
                         onClick={previousMonth}
                         size="icon"
                         variant="ghost"
@@ -1018,7 +1301,7 @@ export function PremiumCalendar() {
                         <ChevronLeft className="h-4 w-4" />
                       </Button>
                       <Button
-                        className="rounded-full px-3 font-medium text-sm hover:bg-white dark:hover:bg-stone-700"
+                        className="rounded-full px-2 font-medium text-xs hover:bg-white sm:px-3 sm:text-sm dark:hover:bg-stone-700"
                         onClick={goToToday}
                         size="sm"
                         variant="ghost"
@@ -1026,7 +1309,7 @@ export function PremiumCalendar() {
                         Today
                       </Button>
                       <Button
-                        className="h-9 w-9 rounded-full hover:bg-white dark:hover:bg-stone-700"
+                        className="h-8 w-8 rounded-full hover:bg-white sm:h-9 sm:w-9 dark:hover:bg-stone-700"
                         onClick={nextMonth}
                         size="icon"
                         variant="ghost"
@@ -1034,39 +1317,83 @@ export function PremiumCalendar() {
                         <ChevronRight className="h-4 w-4" />
                       </Button>
                     </div>
+
+                    <div className="hidden items-center gap-2 px-2 lg:flex">
+                      <div className="h-px w-4 bg-stone-300 dark:bg-stone-700" />
+                      <p className="font-medium text-[11px] text-stone-500 uppercase tracking-[0.25em] dark:text-stone-400">
+                        {monthQuote}
+                      </p>
+                    </div>
                   </div>
 
-                  <div className="flex w-full items-center gap-3 sm:w-auto">
+                  <div className="flex w-full flex-wrap items-center gap-2.5 lg:w-auto lg:flex-nowrap lg:gap-3">
                     <Tabs
-                      className="flex-1 sm:flex-none"
+                      className="w-full lg:w-auto"
                       onValueChange={(nextView) => {
                         if (isCalendarView(nextView)) {
+                          if (nextView === view) {
+                            return;
+                          }
                           setView(nextView);
+                          showInfoToast(
+                            `Switched to ${VIEW_LABELS[nextView]} view`
+                          );
                         }
                       }}
                       value={view}
                     >
-                      <TabsList className="rounded-full bg-stone-100 p-1 dark:bg-stone-800/80">
+                      <TabsList className="grid w-full grid-cols-3 rounded-full bg-stone-100 p-1 lg:flex lg:w-auto dark:bg-stone-800/80">
                         <TabsTrigger
-                          className="rounded-full px-4 data-[state=active]:bg-white data-[state=active]:shadow-sm dark:data-[state=active]:bg-stone-700"
+                          className="rounded-full px-2.5 text-xs data-[state=active]:bg-white data-[state=active]:shadow-sm lg:px-4 lg:text-sm dark:data-[state=active]:bg-stone-700"
                           value="month"
                         >
                           Calendar
                         </TabsTrigger>
                         <TabsTrigger
-                          className="rounded-full px-4 data-[state=active]:bg-white data-[state=active]:shadow-sm dark:data-[state=active]:bg-stone-700"
+                          className="rounded-full px-2.5 text-xs data-[state=active]:bg-white data-[state=active]:shadow-sm lg:px-4 lg:text-sm dark:data-[state=active]:bg-stone-700"
                           value="kanban"
                         >
                           Kanban
+                        </TabsTrigger>
+                        <TabsTrigger
+                          className="rounded-full px-2.5 text-xs data-[state=active]:bg-white data-[state=active]:shadow-sm lg:px-4 lg:text-sm dark:data-[state=active]:bg-stone-700"
+                          value="analytics"
+                        >
+                          Analytics
                         </TabsTrigger>
                       </TabsList>
                     </Tabs>
 
                     <Button
-                      className="rounded-full shadow-lg shadow-stone-900/10 dark:shadow-black/50"
-                      onClick={() =>
-                        setTheme(theme === "dark" ? "light" : "dark")
-                      }
+                      className={cn(
+                        "h-9 shrink-0 rounded-full border px-3 shadow-lg transition-colors",
+                        showWeekNumbers
+                          ? "border-stone-300 bg-stone-200 shadow-inner dark:border-stone-600 dark:bg-stone-700"
+                          : "border-stone-200/40 shadow-stone-900/10 dark:border-stone-800/50 dark:shadow-black/50"
+                      )}
+                      onClick={() => {
+                        const shouldShowWeekNumbers = !showWeekNumbers;
+                        setShowWeekNumbers(shouldShowWeekNumbers);
+                        showInfoToast(
+                          shouldShowWeekNumbers
+                            ? "Week numbers enabled"
+                            : "Week numbers hidden"
+                        );
+                      }}
+                      size="sm"
+                      title="Toggle Week Numbers"
+                      variant="ghost"
+                    >
+                      <span className="font-semibold text-xs">Wk</span>
+                    </Button>
+
+                    <Button
+                      className="h-9 w-9 shrink-0 rounded-full shadow-lg shadow-stone-900/10 dark:shadow-black/50"
+                      onClick={() => {
+                        const nextTheme = theme === "dark" ? "light" : "dark";
+                        setTheme(nextTheme);
+                        showInfoToast(`Switched to ${nextTheme} theme`);
+                      }}
                       size="icon"
                       variant="ghost"
                     >
@@ -1088,14 +1415,16 @@ export function PremiumCalendar() {
                     >
                       <DialogTrigger asChild>
                         <Button
-                          className="rounded-full shadow-lg shadow-stone-900/10"
+                          className="h-9 shrink-0 rounded-full px-3 shadow-lg shadow-stone-900/10 lg:h-10 lg:px-4"
                           onClick={() => openNoteDialog()}
                         >
-                          <Plus className="mr-2 h-4 w-4" />
-                          New Note
+                          <Plus className="h-4 w-4 lg:mr-2" />
+                          <span className="sr-only lg:not-sr-only">
+                            New Note
+                          </span>
                         </Button>
                       </DialogTrigger>
-                      <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto sm:rounded-2xl">
+                      <DialogContent className="max-h-[calc(100dvh-1rem)] w-[calc(100vw-0.75rem)] max-w-2xl overflow-y-auto p-4 sm:max-h-[90vh] sm:w-full sm:rounded-2xl sm:p-6">
                         <DialogHeader>
                           <DialogTitle className="text-xl">
                             {editingNote ? "Edit Note" : "Create Note"}
@@ -1107,7 +1436,10 @@ export function PremiumCalendar() {
                           </DialogDescription>
                         </DialogHeader>
 
-                        <div className="grid gap-6 py-4">
+                        <form
+                          className="grid gap-6 py-2 sm:py-4"
+                          onSubmit={handleSubmit(onSubmit)}
+                        >
                           {/* Calendar Picker */}
                           <div className="space-y-3">
                             <Label className="font-medium text-sm">
@@ -1127,11 +1459,13 @@ export function PremiumCalendar() {
                                     >
                                       <span
                                         className={cn(
-                                          !formStartDate &&
+                                          !watch("formStartDate") &&
                                             "text-muted-foreground"
                                         )}
                                       >
-                                        {formatDialogDateLabel(formStartDate)}
+                                        {formatDialogDateLabel(
+                                          watch("formStartDate")
+                                        )}
                                       </span>
                                       <CalendarIcon className="h-4 w-4 text-muted-foreground" />
                                     </Button>
@@ -1146,7 +1480,8 @@ export function PremiumCalendar() {
                                       mode="single"
                                       onSelect={handleStartDatePick}
                                       selected={
-                                        parseDateKey(formStartDate) ?? undefined
+                                        parseDateKey(watch("formStartDate")) ??
+                                        undefined
                                       }
                                     />
                                   </PopoverContent>
@@ -1165,11 +1500,13 @@ export function PremiumCalendar() {
                                     >
                                       <span
                                         className={cn(
-                                          !formEndDate &&
+                                          !watch("formEndDate") &&
                                             "text-muted-foreground"
                                         )}
                                       >
-                                        {formatDialogDateLabel(formEndDate)}
+                                        {formatDialogDateLabel(
+                                          watch("formEndDate")
+                                        )}
                                       </span>
                                     </Button>
                                   </PopoverTrigger>
@@ -1183,28 +1520,28 @@ export function PremiumCalendar() {
                                         if (isPastDate(date)) {
                                           return true;
                                         }
-
-                                        const parsedStart =
-                                          parseDateKey(formStartDate);
+                                        const parsedStart = parseDateKey(
+                                          watch("formStartDate")
+                                        );
                                         if (!parsedStart) {
                                           return false;
                                         }
-
                                         return date < parsedStart;
                                       }}
                                       mode="single"
                                       onSelect={handleEndDatePick}
                                       selected={
-                                        parseDateKey(formEndDate) ?? undefined
+                                        parseDateKey(watch("formEndDate")) ??
+                                        undefined
                                       }
                                     />
                                   </PopoverContent>
                                 </Popover>
                               </div>
                             </div>
-                            {dateFieldError && (
+                            {(errors.formStartDate || errors.formEndDate) && (
                               <p className="font-medium text-rose-600 text-xs">
-                                {dateFieldError}
+                                Dates are required.
                               </p>
                             )}
                           </div>
@@ -1216,17 +1553,14 @@ export function PremiumCalendar() {
                               <Input
                                 className="rounded-lg"
                                 id="title"
-                                onChange={(event) => {
-                                  setNoteTitle(event.target.value);
-                                  clearFormError("title");
-                                }}
                                 placeholder="What needs to be done?"
-                                required
-                                value={noteTitle}
+                                {...register("title", {
+                                  required: "Title is required",
+                                })}
                               />
-                              {formErrors.title && (
+                              {errors.title && (
                                 <p className="font-medium text-rose-600 text-xs">
-                                  {formErrors.title}
+                                  {errors.title.message}
                                 </p>
                               )}
                             </div>
@@ -1236,33 +1570,27 @@ export function PremiumCalendar() {
                               <Textarea
                                 className="resize-none rounded-lg"
                                 id="description"
-                                onChange={(event) => {
-                                  setNoteDescription(event.target.value);
-                                  clearFormError("description");
-                                }}
                                 placeholder="Add more details..."
-                                required
                                 rows={3}
-                                value={noteDescription}
+                                {...register("description", {
+                                  required: "Description is required",
+                                })}
                               />
-                              {formErrors.description && (
+                              {errors.description && (
                                 <p className="font-medium text-rose-600 text-xs">
-                                  {formErrors.description}
+                                  {errors.description.message}
                                 </p>
                               )}
                             </div>
 
-                            <div className="grid grid-cols-2 gap-4">
+                            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                               <div className="space-y-2">
                                 <Label>Priority</Label>
                                 <Select
-                                  onValueChange={(priority) => {
-                                    if (isNotePriority(priority)) {
-                                      setNotePriority(priority);
-                                      clearFormError("priority");
-                                    }
-                                  }}
-                                  value={notePriority}
+                                  onValueChange={(val) =>
+                                    setValue("priority", val as NotePriority)
+                                  }
+                                  value={watch("priority")}
                                 >
                                   <SelectTrigger className="rounded-lg">
                                     <SelectValue />
@@ -1270,39 +1598,33 @@ export function PremiumCalendar() {
                                   <SelectContent>
                                     <SelectItem value="low">
                                       <span className="flex items-center gap-2">
-                                        <Circle className="h-3 w-3 text-emerald-500" />
+                                        <Circle className="h-3 w-3 text-emerald-500" />{" "}
                                         Low
                                       </span>
                                     </SelectItem>
                                     <SelectItem value="medium">
                                       <span className="flex items-center gap-2">
-                                        <AlertCircle className="h-3 w-3 text-amber-500" />
+                                        <AlertCircle className="h-3 w-3 text-amber-500" />{" "}
                                         Medium
                                       </span>
                                     </SelectItem>
                                     <SelectItem value="high">
                                       <span className="flex items-center gap-2">
-                                        <Sparkles className="h-3 w-3 text-rose-500" />
+                                        <Sparkles className="h-3 w-3 text-rose-500" />{" "}
                                         High
                                       </span>
                                     </SelectItem>
                                   </SelectContent>
                                 </Select>
-                                {formErrors.priority && (
-                                  <p className="font-medium text-rose-600 text-xs">
-                                    {formErrors.priority}
-                                  </p>
-                                )}
                               </div>
 
                               <div className="space-y-2">
                                 <Label>Status</Label>
                                 <Select
-                                  onValueChange={(value) => {
-                                    setNoteStatus(value as NoteStatus);
-                                    clearFormError("status");
-                                  }}
-                                  value={noteStatus}
+                                  onValueChange={(val) =>
+                                    setValue("status", val as NoteStatus)
+                                  }
+                                  value={watch("status")}
                                 >
                                   <SelectTrigger className="rounded-lg">
                                     <SelectValue />
@@ -1315,39 +1637,33 @@ export function PremiumCalendar() {
                                     <SelectItem value="done">Done</SelectItem>
                                   </SelectContent>
                                 </Select>
-                                {formErrors.status && (
-                                  <p className="font-medium text-rose-600 text-xs">
-                                    {formErrors.status}
-                                  </p>
-                                )}
                               </div>
                             </div>
 
                             <div className="space-y-2">
                               <Label>Color</Label>
-                              <div className="flex gap-2">
+                              <div className="flex flex-wrap gap-2">
                                 {NOTE_COLORS.map((color) => (
                                   <button
                                     className={cn(
                                       "h-8 w-8 rounded-full transition-all duration-200",
                                       color.bg,
-                                      noteColor === color.value
+                                      watch("color") === color.value
                                         ? "scale-110 ring-2 ring-stone-900 ring-offset-2"
                                         : "hover:scale-105"
                                     )}
                                     key={color.value}
-                                    onClick={() => {
-                                      setNoteColor(color.value);
-                                      clearFormError("color");
-                                    }}
+                                    onClick={() =>
+                                      setValue("color", color.value)
+                                    }
                                     title={color.name}
                                     type="button"
                                   />
                                 ))}
                               </div>
-                              {formErrors.color && (
+                              {errors.color && (
                                 <p className="font-medium text-rose-600 text-xs">
-                                  {formErrors.color}
+                                  {errors.color.message}
                                 </p>
                               )}
                             </div>
@@ -1359,18 +1675,15 @@ export function PremiumCalendar() {
                                 <Input
                                   className="rounded-lg pl-10"
                                   id="location"
-                                  onChange={(event) => {
-                                    setNoteLocation(event.target.value);
-                                    clearFormError("location");
-                                  }}
                                   placeholder="Add location"
-                                  required
-                                  value={noteLocation}
+                                  {...register("location", {
+                                    required: "Location is required",
+                                  })}
                                 />
                               </div>
-                              {formErrors.location && (
+                              {errors.location && (
                                 <p className="font-medium text-rose-600 text-xs">
-                                  {formErrors.location}
+                                  {errors.location.message}
                                 </p>
                               )}
                             </div>
@@ -1382,43 +1695,194 @@ export function PremiumCalendar() {
                                 <Input
                                   className="rounded-lg pl-10"
                                   id="tags"
-                                  onChange={(event) => {
-                                    setNoteTags(event.target.value);
-                                    clearFormError("tags");
-                                  }}
                                   placeholder="work, personal, urgent"
-                                  required
-                                  value={noteTags}
+                                  {...register("tags", {
+                                    required: "At least one tag is required",
+                                  })}
                                 />
                               </div>
-                              {formErrors.tags && (
+                              {errors.tags && (
                                 <p className="font-medium text-rose-600 text-xs">
-                                  {formErrors.tags}
+                                  {errors.tags.message}
                                 </p>
                               )}
                             </div>
+
+                            <div className="grid gap-5 lg:gap-6">
+                              <div className="space-y-2">
+                                <Label htmlFor="time">Time (optional)</Label>
+                                <div className="rounded-lg border border-input bg-background px-2 py-2">
+                                  <Input type="hidden" {...register("time")} />
+                                  <div className="flex items-start gap-2">
+                                    <Clock className="mt-2 h-4 w-4 shrink-0 text-muted-foreground" />
+                                    <div
+                                      className={cn(
+                                        "grid min-w-0 flex-1 gap-2",
+                                        resolvedTimeMode === "12h"
+                                          ? "grid-cols-2 md:grid-cols-4"
+                                          : "grid-cols-2 md:grid-cols-3"
+                                      )}
+                                    >
+                                      <Select
+                                        onValueChange={(value) =>
+                                          handleTimeModeChange(
+                                            value as TimeInputMode
+                                          )
+                                        }
+                                        value={resolvedTimeMode}
+                                      >
+                                        <SelectTrigger
+                                          className="w-full min-w-0"
+                                          id="time-mode"
+                                        >
+                                          <SelectValue placeholder="Mode" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          <SelectItem value={TIME_MODE_NONE}>
+                                            No time
+                                          </SelectItem>
+                                          <SelectItem value="12h">
+                                            12h
+                                          </SelectItem>
+                                          <SelectItem value="24h">
+                                            24h
+                                          </SelectItem>
+                                        </SelectContent>
+                                      </Select>
+
+                                      <Select
+                                        disabled={
+                                          resolvedTimeMode === TIME_MODE_NONE
+                                        }
+                                        onValueChange={handleTimeHourChange}
+                                        value={
+                                          resolvedTimeMode === "24h"
+                                            ? parsedStoredTime.hour24String
+                                            : parsedStoredTime.hour12String
+                                        }
+                                      >
+                                        <SelectTrigger
+                                          className="w-full min-w-0"
+                                          id="time-hour"
+                                        >
+                                          <SelectValue placeholder="HH" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          {(resolvedTimeMode === "24h"
+                                            ? TIME_HOUR_OPTIONS_24
+                                            : TIME_HOUR_OPTIONS_12
+                                          ).map((hour) => (
+                                            <SelectItem key={hour} value={hour}>
+                                              {hour}
+                                            </SelectItem>
+                                          ))}
+                                        </SelectContent>
+                                      </Select>
+
+                                      <Select
+                                        disabled={
+                                          resolvedTimeMode === TIME_MODE_NONE
+                                        }
+                                        onValueChange={handleTimeMinuteChange}
+                                        value={parsedStoredTime.minuteString}
+                                      >
+                                        <SelectTrigger
+                                          className="w-full min-w-0"
+                                          id="time-minute"
+                                        >
+                                          <SelectValue placeholder="MM" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          {TIME_MINUTE_OPTIONS.map((minute) => (
+                                            <SelectItem
+                                              key={minute}
+                                              value={minute}
+                                            >
+                                              {minute}
+                                            </SelectItem>
+                                          ))}
+                                        </SelectContent>
+                                      </Select>
+
+                                      {resolvedTimeMode === "12h" && (
+                                        <Select
+                                          onValueChange={(value) =>
+                                            handleTimeMeridiemChange(
+                                              value as TimeMeridiem
+                                            )
+                                          }
+                                          value={parsedStoredTime.meridiem}
+                                        >
+                                          <SelectTrigger
+                                            className="w-full min-w-0"
+                                            id="time-meridiem"
+                                          >
+                                            <SelectValue placeholder="AM/PM" />
+                                          </SelectTrigger>
+                                          <SelectContent>
+                                            <SelectItem value="AM">
+                                              AM
+                                            </SelectItem>
+                                            <SelectItem value="PM">
+                                              PM
+                                            </SelectItem>
+                                          </SelectContent>
+                                        </Select>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+
+                              <div className="space-y-2">
+                                <Label htmlFor="recurring">Recurring</Label>
+                                <Select
+                                  onValueChange={(val) =>
+                                    setValue("recurring", val as RecurringType)
+                                  }
+                                  value={watch("recurring")}
+                                >
+                                  <SelectTrigger className="mt-1 h-11 w-full rounded-lg">
+                                    <SelectValue placeholder="Select recurrence" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="none">None</SelectItem>
+                                    <SelectItem value="daily">Daily</SelectItem>
+                                    <SelectItem value="weekly">
+                                      Weekly
+                                    </SelectItem>
+                                    <SelectItem value="monthly">
+                                      Monthly
+                                    </SelectItem>
+                                    <SelectItem value="yearly">
+                                      Yearly
+                                    </SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                            </div>
                           </div>
 
-                          <div className="flex justify-end gap-3 border-t pt-4">
+                          <div className="flex flex-col-reverse gap-2 border-t pt-4 sm:flex-row sm:justify-end">
                             <Button
-                              className="rounded-lg"
+                              className="w-full rounded-lg sm:w-auto"
                               onClick={() => {
                                 setIsDialogOpen(false);
                                 resetForm();
                               }}
+                              type="button"
                               variant="ghost"
                             >
                               Cancel
                             </Button>
                             <Button
-                              className="rounded-lg"
-                              disabled={isSaveDisabled}
-                              onClick={handleSaveNote}
+                              className="w-full rounded-lg sm:w-auto"
+                              type="submit"
                             >
                               {editingNote ? "Save Changes" : "Create Note"}
                             </Button>
                           </div>
-                        </div>
+                        </form>
                       </DialogContent>
                     </Dialog>
                   </div>
@@ -1449,7 +1913,10 @@ export function PremiumCalendar() {
                     </div>
                     <Button
                       className="text-stone-500 dark:text-stone-400 dark:hover:bg-stone-800"
-                      onClick={() => setSelectedDates([])}
+                      onClick={() => {
+                        setSelectedDates([]);
+                        showInfoToast("Selection cleared");
+                      }}
                       size="sm"
                       variant="ghost"
                     >
@@ -1459,7 +1926,7 @@ export function PremiumCalendar() {
                 )}
 
                 {/* Views */}
-                {view === "month" ? (
+                {view === "month" && (
                   <div className="space-y-4">
                     {/* Day Headers */}
                     <div className="mb-1 grid grid-cols-7 gap-px">
@@ -1494,6 +1961,11 @@ export function PremiumCalendar() {
                         const inRange = isInSelectedRange(date);
                         const isStart = isRangeStart(date);
                         const isEnd = isRangeEnd(date);
+                        const hasWeekTag =
+                          showWeekNumbers && date.getDay() === 1;
+                        const weekNum = hasWeekTag
+                          ? getIsoWeekNumber(date)
+                          : null;
 
                         return (
                           <Popover key={dateKey}>
@@ -1503,7 +1975,9 @@ export function PremiumCalendar() {
                                   "relative aspect-square p-1.5 transition-all duration-200 sm:aspect-4/3 sm:p-2",
                                   "group hover:z-10",
                                   !isCurrentMonthDate &&
-                                    "bg-stone-100/60 opacity-20 dark:bg-stone-900/60",
+                                    (hasWeekTag
+                                      ? "bg-stone-100/70 opacity-45 dark:bg-stone-900/70"
+                                      : "bg-stone-100/60 opacity-20 dark:bg-stone-900/60"),
                                   isPast && isCurrentMonthDate && "opacity-45",
                                   isCurrentMonthDate &&
                                     !isPast &&
@@ -1529,27 +2003,38 @@ export function PremiumCalendar() {
                                 onClick={() => handleDateClick(date)}
                                 type="button"
                               >
-                                <div className="flex h-full flex-col">
-                                  <div
-                                    className={cn(
-                                      "font-semibold text-sm tabular-nums sm:text-base",
-                                      isTodayDate &&
-                                        !isStart &&
-                                        !isEnd &&
-                                        "text-white",
-                                      isWeekend &&
-                                        !isTodayDate &&
-                                        !isStart &&
-                                        !isEnd &&
-                                        "text-(--cal-weekend)",
-                                      (isStart || isEnd) &&
-                                        !isTodayDate &&
-                                        "text-white"
-                                    )}
-                                  >
-                                    {date.getDate()}
+                                <div
+                                  className={cn(
+                                    "flex h-full flex-col",
+                                    hasWeekTag && "pt-4 sm:pt-5"
+                                  )}
+                                >
+                                  {weekNum && (
+                                    <div className="pointer-events-none absolute top-1 left-1 inline-flex min-w-8 items-center justify-center rounded bg-stone-200/95 px-1.5 py-0.5 font-bold font-mono text-[9px] text-stone-600 leading-none shadow-[inset_0_1px_0_rgba(255,255,255,0.45)] dark:bg-stone-700/95 dark:text-stone-200">
+                                      W{weekNum}
+                                    </div>
+                                  )}
+                                  <div className="flex items-start justify-end">
+                                    <div
+                                      className={cn(
+                                        "font-semibold text-sm tabular-nums sm:text-base",
+                                        isTodayDate &&
+                                          !isStart &&
+                                          !isEnd &&
+                                          "text-white",
+                                        isWeekend &&
+                                          !isTodayDate &&
+                                          !isStart &&
+                                          !isEnd &&
+                                          "text-(--cal-weekend)",
+                                        (isStart || isEnd) &&
+                                          !isTodayDate &&
+                                          "text-white"
+                                      )}
+                                    >
+                                      {date.getDate()}
+                                    </div>
                                   </div>
-
                                   {/* Holiday indicator */}
                                   {holiday && (
                                     <span
@@ -1647,7 +2132,8 @@ export function PremiumCalendar() {
                       })}
                     </div>
                   </div>
-                ) : (
+                )}
+                {view === "kanban" && (
                   /* Kanban View */
                   <div className="grid grid-cols-1 gap-6 sm:gap-8 md:grid-cols-3">
                     {(Object.keys(STATUS_CONFIG) as NoteStatus[]).map(
@@ -1825,6 +2311,46 @@ export function PremiumCalendar() {
                                                 </span>
                                               )}
                                             </div>
+
+                                            <div className="mt-3 md:hidden">
+                                              <Label className="mb-1 block text-[10px] text-current uppercase tracking-[0.12em] opacity-70">
+                                                Move to
+                                              </Label>
+                                              <Select
+                                                onValueChange={(nextStatus) => {
+                                                  if (
+                                                    isNoteStatus(nextStatus) &&
+                                                    nextStatus !== note.status
+                                                  ) {
+                                                    handleStatusChange(
+                                                      note.id,
+                                                      nextStatus
+                                                    );
+                                                  }
+                                                }}
+                                                value={note.status}
+                                              >
+                                                <SelectTrigger className="h-8 border-black/10 bg-white/70 text-[11px] dark:border-white/10 dark:bg-black/20">
+                                                  <SelectValue />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                  {NOTE_STATUSES.map(
+                                                    (statusValue) => (
+                                                      <SelectItem
+                                                        key={statusValue}
+                                                        value={statusValue}
+                                                      >
+                                                        {
+                                                          STATUS_CONFIG[
+                                                            statusValue
+                                                          ].label
+                                                        }
+                                                      </SelectItem>
+                                                    )
+                                                  )}
+                                                </SelectContent>
+                                              </Select>
+                                            </div>
                                           </div>
                                         </div>
                                       </Card>
@@ -1837,6 +2363,93 @@ export function PremiumCalendar() {
                         );
                       }
                     )}
+                  </div>
+                )}
+
+                {view === "analytics" && (
+                  /* Analytics View */
+                  <div className="grid grid-cols-1 gap-6 sm:gap-8 md:grid-cols-2">
+                    <Card className="rounded-2xl border-stone-200/50 bg-stone-50/50 p-6 shadow-inner dark:border-stone-800 dark:bg-stone-900/50">
+                      <div className="mb-6 flex items-center gap-3">
+                        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-100 dark:bg-blue-900/30">
+                          <LineChart className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                        </div>
+                        <div>
+                          <h3 className="font-semibold text-lg text-stone-900 dark:text-stone-100">
+                            Task Priorities
+                          </h3>
+                          <p className="text-stone-500 text-xs dark:text-stone-400">
+                            Distribution of active workload
+                          </p>
+                        </div>
+                      </div>
+                      <div className="space-y-4">
+                        {NOTE_PRIORITIES.map((p) => {
+                          const count = notes.filter(
+                            (n) => n.priority === p
+                          ).length;
+                          const perc =
+                            notes.length > 0
+                              ? Math.round((count / notes.length) * 100)
+                              : 0;
+                          return (
+                            <div className="space-y-1" key={p}>
+                              <div className="flex items-center justify-between font-medium text-xs">
+                                <span className="text-stone-600 uppercase dark:text-stone-300">
+                                  {p}
+                                </span>
+                                <span>{perc}%</span>
+                              </div>
+                              <div className="h-2 w-full overflow-hidden rounded-full bg-stone-200 dark:bg-stone-800">
+                                <Progress
+                                  className="h-2 w-full overflow-hidden rounded-full bg-stone-200 dark:bg-stone-800"
+                                  indicatorClassName={cn(
+                                    "rounded-full transition-all",
+                                    PRIORITY_PROGRESS_CLASS[p]
+                                  )}
+                                  value={perc}
+                                />
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </Card>
+
+                    <div className="group relative">
+                      <div className="absolute inset-0 translate-y-1 rotate-1 rounded-sm bg-black/10 blur-sm dark:bg-black/30" />
+                      <Card className="relative min-h-55 rounded-none border border-black/5 bg-stone-100 p-6 shadow-[0_4px_12px_rgba(0,0,0,0.05)] dark:border-white/5 dark:bg-stone-800">
+                        <div className="absolute top-2 right-4 flex gap-1">
+                          <div className="h-2 w-2 rounded-full bg-black/10 dark:bg-white/10" />
+                          <div className="h-2 w-2 rounded-full bg-black/10 dark:bg-white/10" />
+                        </div>
+                        <div className="mt-2 mb-8 flex items-center gap-2">
+                          <StickyNote className="h-5 w-5 text-stone-700 dark:text-stone-300" />
+                          <h3 className="font-bold font-display text-2xl text-stone-800 tracking-tight dark:text-stone-100">
+                            Monthly Summary
+                          </h3>
+                        </div>
+                        <div className="space-y-3 font-mono text-sm text-stone-700 dark:text-stone-300">
+                          <div className="flex items-center justify-between border-black/5 border-b pb-2 dark:border-white/5">
+                            <span>Total Tasks Logged</span>
+                            <span className="font-bold text-base">
+                              {notes.length}
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-between border-black/5 border-b pb-2 dark:border-white/5">
+                            <span>Tasks Completed</span>
+                            <span className="font-bold text-base text-emerald-600 dark:text-emerald-400">
+                              {notesByStatus.done.length}
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-between pt-2 text-stone-500 text-xs">
+                            <span className="uppercase tracking-widest">
+                              {yearNum} / {format(currentDate, "MMMM")}
+                            </span>
+                          </div>
+                        </div>
+                      </Card>
+                    </div>
                   </div>
                 )}
 

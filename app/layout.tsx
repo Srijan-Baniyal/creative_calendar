@@ -17,25 +17,57 @@ const playfair = Playfair_Display({
 });
 
 export const metadata: Metadata = {
-  title: "Interactive Wall Calendar",
+  title: {
+    default: "Creative Calendar",
+    template: "%s | Creative Calendar",
+  },
+  applicationName: "Creative Calendar",
   description:
-    "A beautiful, interactive wall calendar with date range selection and notes",
+    "A polished, interactive wall calendar with date range planning, integrated notes, and responsive desktop/mobile UX.",
+  manifest: "/favicon/site.webmanifest",
   icons: {
     icon: [
       {
-        url: "/icon-light-32x32.png",
-        media: "(prefers-color-scheme: light)",
+        url: "/favicon/favicon.ico",
+        sizes: "any",
       },
       {
-        url: "/icon-dark-32x32.png",
-        media: "(prefers-color-scheme: dark)",
+        url: "/favicon/favicon-16x16.png",
+        type: "image/png",
+        sizes: "16x16",
       },
       {
-        url: "/icon.svg",
-        type: "image/svg+xml",
+        url: "/favicon/favicon-32x32.png",
+        type: "image/png",
+        sizes: "32x32",
       },
     ],
-    apple: "/apple-icon.png",
+    apple: [
+      {
+        url: "/favicon/apple-touch-icon.png",
+        sizes: "180x180",
+        type: "image/png",
+      },
+    ],
+  },
+  openGraph: {
+    title: "Creative Calendar",
+    description:
+      "Plan your month with tactile wall-calendar visuals, range selection, and integrated notes.",
+    type: "website",
+    images: [
+      {
+        url: "/January.png",
+        alt: "Creative Calendar preview",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Creative Calendar",
+    description:
+      "Interactive wall calendar with date range selection and built-in notes.",
+    images: ["/January.png"],
   },
 };
 
@@ -52,7 +84,7 @@ export default function RootLayout({
         <ThemeProvider attribute="class" defaultTheme="system">
           {children}
         </ThemeProvider>
-        <Toaster position={"bottom-right"} richColors />
+        <Toaster position={"bottom-right"} richColors theme="light" />
       </body>
     </html>
   );

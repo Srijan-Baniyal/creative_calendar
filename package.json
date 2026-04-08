@@ -1,5 +1,6 @@
 {
-  "name": "my-project",
+  "name": "creative-calendar",
+  "description": "Interactive wall calendar frontend challenge built with Next.js",
   "version": "0.1.0",
   "private": true,
   "scripts": {

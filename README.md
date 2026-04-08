@@ -2,6 +2,10 @@
 
 Polished, interactive wall-calendar experience built in Next.js and React, with a hero-led composition, date-range planning, integrated notes, and a full design-system driven UI surface.
 
+## Project Status
+
+Completed.
+
 ## What Is Implemented
 
 - Wall calendar aesthetic:
@@ -15,9 +19,14 @@ Polished, interactive wall-calendar experience built in Next.js and React, with 
   - Main monthly notes editor
   - Quick capture flows (sheet and drawer)
   - Character count and validation feedback
+  - Responsive time composer with `No time`, `12h` (`HH:MM AM/PM`), and `24h` (`HH:MM`) modes
 - Fully responsive:
   - Desktop uses segmented composition with side navigation and resizable workspace
   - Mobile preserves all core interactions via drawer/sheet + stacked flow
+  - Calendar dialog controls adapt to available width (time and recurrence remain aligned at all breakpoints)
+- Colorful UX feedback:
+  - Action toasts for create/update/delete/status/navigation/view/theme/selection interactions
+  - Toast palette remains consistent across light and dark theme switches
 - Frontend-only persistence:
   - Local storage state schema with versioning
   - Restores month, range, notes, reminders, and view settings
@@ -41,6 +50,7 @@ The implementation uses the tokenized design system defined in app/globals.css f
 - Interactive calendar shell isolated in a client component
 - Shared UI primitives from local shadcn layer
 - Theme-aware notifications through design-system toaster
+- Fixed-light colorful toaster presentation for stable cross-theme feedback styling
 
 ## Run Locally
 
@@ -64,9 +74,9 @@ Current status: bun run check passes.
 
 ## Submission Links
 
-- Source repository: ADD_PUBLIC_REPO_LINK
-- Video demo (required): ADD_VIDEO_LINK
-- Live demo (optional): ADD_DEPLOYED_LINK
+- Source repository: https://github.com/Srijan-Baniyal/creative_calendar
+- Video demo (required): Pending final upload
+- Live demo (optional): Pending optional deployment
 
 ## Recommended Video Walkthrough
 
