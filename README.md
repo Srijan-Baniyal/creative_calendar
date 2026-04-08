@@ -49,7 +49,7 @@ bun install
 bun run dev
 ```
 
-Open: http://localhost:3000
+Open: <http://localhost:3000>
 
 ## Quality Gates
 
@@ -74,4 +74,4 @@ Current status: bun run check passes.
 2. Demonstrate date range selection (start, end, in-between).
 3. Demonstrate notes editing, quick capture, and persistence.
 4. Demonstrate mobile viewport usability.
-5. Demonstrate advanced controls (command palette, menu actions, sheet/drawer).
+5. Demonstrate advanced controls (command palette, menu actions, sheet/drawer)

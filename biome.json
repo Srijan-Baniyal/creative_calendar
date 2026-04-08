@@ -28,6 +28,12 @@
       },
       "suspicious": {
         "noUnknownAtRules": "off"
+      },
+      "performance": {
+        "noNamespaceImport": "off"
+      },
+      "style": {
+        "useFilenamingConvention": "off"
       }
     },
     "domains": {

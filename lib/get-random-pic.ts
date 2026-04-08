@@ -42,7 +42,7 @@ export function getArtworkSourceForMonth(monthIndex: number): string {
   return DEFAULT_ARTWORK;
 }
 
-export async function GetRandomPic(): Promise<CalendarArtwork> {
+export function GetRandomPic(): CalendarArtwork {
   const now = new Date();
   const monthIndex = now.getMonth();
   const monthName = MONTH_NAMES[monthIndex] ?? MONTH_NAMES[0];
