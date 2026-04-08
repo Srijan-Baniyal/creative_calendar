@@ -11,12 +11,15 @@ import {
   Edit2,
   GripVertical,
   MapPin,
+  Moon,
   Plus,
   Sparkles,
+  Sun,
   Tag as TagIcon,
   Trash2,
 } from "lucide-react";
 import Image from "next/image";
+import { useTheme } from "next-themes";
 import { useEffect, useMemo, useState } from "react";
 import type { DateRange } from "react-day-picker";
 import { toast } from "sonner";
@@ -204,21 +207,21 @@ const PRIORITY_CONFIG = {
 const STATUS_CONFIG = {
   todo: {
     label: "To Do",
-    color: "bg-slate-100",
-    headerColor: "bg-slate-50",
-    borderColor: "border-slate-200",
+    color: "bg-slate-100 dark:bg-slate-900/40",
+    headerColor: "bg-slate-50 dark:bg-slate-900/40",
+    borderColor: "border-slate-200 dark:border-slate-800",
   },
   "in-progress": {
     label: "In Progress",
-    color: "bg-blue-100",
-    headerColor: "bg-blue-50",
-    borderColor: "border-blue-200",
+    color: "bg-blue-100 dark:bg-blue-900/40",
+    headerColor: "bg-blue-50 dark:bg-blue-900/40",
+    borderColor: "border-blue-200 dark:border-blue-800",
   },
   done: {
     label: "Done",
-    color: "bg-emerald-100",
-    headerColor: "bg-emerald-50",
-    borderColor: "border-emerald-200",
+    color: "bg-emerald-100 dark:bg-emerald-900/40",
+    headerColor: "bg-emerald-50 dark:bg-emerald-900/40",
+    borderColor: "border-emerald-200 dark:border-emerald-800",
   },
 };
 
@@ -227,78 +230,84 @@ const NOTE_COLORS = [
     name: "Slate",
     value: "slate",
     bg: "bg-slate-500",
-    light: "bg-slate-50",
-    border: "border-slate-200",
+    light:
+      "bg-slate-50 text-slate-700 dark:bg-slate-500/20 dark:text-slate-300",
+    border: "border-slate-200 dark:border-slate-800",
   },
   {
     name: "Blue",
     value: "blue",
     bg: "bg-blue-500",
-    light: "bg-blue-50",
-    border: "border-blue-200",
+    light: "bg-blue-50 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300",
+    border: "border-blue-200 dark:border-blue-800",
   },
   {
     name: "Emerald",
     value: "emerald",
     bg: "bg-emerald-500",
-    light: "bg-emerald-50",
-    border: "border-emerald-200",
+    light:
+      "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300",
+    border: "border-emerald-200 dark:border-emerald-800",
   },
   {
     name: "Amber",
     value: "amber",
     bg: "bg-amber-500",
-    light: "bg-amber-50",
-    border: "border-amber-200",
+    light:
+      "bg-amber-50 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300",
+    border: "border-amber-200 dark:border-amber-800",
   },
   {
     name: "Rose",
     value: "rose",
     bg: "bg-rose-500",
-    light: "bg-rose-50",
-    border: "border-rose-200",
+    light: "bg-rose-50 text-rose-700 dark:bg-rose-500/20 dark:text-rose-300",
+    border: "border-rose-200 dark:border-rose-800",
   },
   {
     name: "Violet",
     value: "violet",
     bg: "bg-violet-500",
-    light: "bg-violet-50",
-    border: "border-violet-200",
+    light:
+      "bg-violet-50 text-violet-700 dark:bg-violet-500/20 dark:text-violet-300",
+    border: "border-violet-200 dark:border-violet-800",
   },
   {
     name: "Cyan",
     value: "cyan",
     bg: "bg-cyan-500",
-    light: "bg-cyan-50",
-    border: "border-cyan-200",
+    light: "bg-cyan-50 text-cyan-700 dark:bg-cyan-500/20 dark:text-cyan-300",
+    border: "border-cyan-200 dark:border-cyan-800",
   },
   {
     name: "Orange",
     value: "orange",
     bg: "bg-orange-500",
-    light: "bg-orange-50",
-    border: "border-orange-200",
+    light:
+      "bg-orange-50 text-orange-700 dark:bg-orange-500/20 dark:text-orange-300",
+    border: "border-orange-200 dark:border-orange-800",
   },
   {
     name: "Pink",
     value: "pink",
     bg: "bg-pink-500",
-    light: "bg-pink-50",
-    border: "border-pink-200",
+    light: "bg-pink-50 text-pink-700 dark:bg-pink-500/20 dark:text-pink-300",
+    border: "border-pink-200 dark:border-pink-800",
   },
   {
     name: "Indigo",
     value: "indigo",
     bg: "bg-indigo-500",
-    light: "bg-indigo-50",
-    border: "border-indigo-200",
+    light:
+      "bg-indigo-50 text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-300",
+    border: "border-indigo-200 dark:border-indigo-800",
   },
   {
     name: "Teal",
     value: "teal",
     bg: "bg-teal-500",
-    light: "bg-teal-50",
-    border: "border-teal-200",
+    light: "bg-teal-50 text-teal-700 dark:bg-teal-500/20 dark:text-teal-300",
+    border: "border-teal-200 dark:border-teal-800",
   },
 ];
 
@@ -343,6 +352,7 @@ export function PremiumCalendar() {
   const [editingNote, setEditingNote] = useState<Note | null>(null);
   const [view, setView] = useState<CalendarView>("month");
   const [draggedNote, setDraggedNote] = useState<Note | null>(null);
+  const { theme, setTheme } = useTheme();
 
   // Form state
   const [noteTitle, setNoteTitle] = useState("");
@@ -689,7 +699,7 @@ export function PremiumCalendar() {
     const firstDay = new Date(year, month, 1);
     const lastDay = new Date(year, month + 1, 0);
     const daysInMonth = lastDay.getDate();
-    const startingDayOfWeek = firstDay.getDay();
+    const startingDayOfWeek = (firstDay.getDay() + 6) % 7;
     const days: Date[] = [];
 
     for (let i = 0; i < startingDayOfWeek; i++) {
@@ -712,7 +722,10 @@ export function PremiumCalendar() {
   const getNotesForDate = (date: Date) => {
     const dateStr = formatDateKey(date);
     return notes.filter(
-      (note) => dateStr >= note.startDate && dateStr <= note.endDate
+      (note) =>
+        dateStr >= note.startDate &&
+        dateStr <= note.endDate &&
+        note.status !== "done"
     );
   };
 
@@ -870,33 +883,89 @@ export function PremiumCalendar() {
 
   return (
     <TooltipProvider>
-      <div className="min-h-screen bg-linear-to-br from-stone-100 via-stone-50 to-amber-50/30 p-3 sm:p-6 lg:p-10">
-        <div className="mx-auto max-w-6xl">
-          {/* Calendar Container with Shadow */}
-          <div className="relative">
-            {/* Wall Hook Shadow */}
-            <div className="absolute -top-3 left-1/2 h-6 w-20 -translate-x-1/2 rounded-full bg-linear-to-b from-stone-400/20 to-transparent blur-sm" />
-
-            {/* Hanging Wire */}
-            <div className="absolute -top-8 left-1/2 flex -translate-x-1/2 flex-col items-center">
-              <div className="h-4 w-1 rounded-full bg-linear-to-b from-stone-400 to-stone-500" />
-              <div className="h-4 w-8 rounded-full border-2 border-stone-400 border-t-0" />
+      <div className="calendar-wall min-h-screen p-4 sm:p-8 lg:p-12">
+        <div className="mx-auto max-w-4xl">
+          {/* Calendar Container */}
+          <div className="calendar-enter relative pt-16 sm:pt-20">
+            {/* ── Wall Nail ── */}
+            <div className="absolute top-0 left-1/2 z-20 -translate-x-1/2">
+              <div className="relative flex flex-col items-center">
+                {/* Nail head */}
+                <div className="relative h-3.5 w-3.5 rounded-full bg-linear-to-br from-stone-400 via-stone-500 to-stone-600 shadow-[0_2px_6px_rgba(0,0,0,0.3)]">
+                  <div className="absolute inset-0.5 rounded-full bg-linear-to-br from-stone-300 to-stone-400" />
+                  <div className="absolute top-0.5 left-1 h-1 w-1 rounded-full bg-white/40" />
+                </div>
+                {/* Nail shadow on wall */}
+                <div className="absolute top-1 h-3 w-7 rounded-full bg-stone-900/10 blur-sm" />
+              </div>
             </div>
 
-            <Card className="overflow-hidden border-0 bg-white shadow-[0_25px_60px_-15px_rgba(0,0,0,0.2)]">
-              {/* Spiral Binding */}
-              <div className="relative flex h-8 items-center justify-center gap-4.5 overflow-hidden bg-linear-to-b from-stone-200 via-stone-100 to-white">
-                <div className="absolute inset-0 bg-[linear-gradient(90deg,transparent_0%,rgba(0,0,0,0.02)_50%,transparent_100%)]" />
+            {/* ── Hanging String ── */}
+            <div className="absolute top-3 left-1/2 z-10 -translate-x-1/2">
+              <svg
+                aria-hidden="true"
+                className="drop-shadow-[0_1px_2px_rgba(0,0,0,0.15)]"
+                fill="none"
+                height="68"
+                viewBox="0 0 60 68"
+                width="60"
+              >
+                <title>Hanging string</title>
+                {/* String shadow */}
+                <path
+                  d="M30 0 C28 0, 12 10, 12 30 C12 48, 20 55, 30 65 C40 55, 48 48, 48 30 C48 10, 32 0, 30 0Z"
+                  fill="rgba(0,0,0,0.04)"
+                  transform="translate(0, 2)"
+                />
+                {/* Left string */}
+                <path
+                  d="M30 0 C28 2, 16 12, 14 30 C12 44, 20 54, 30 64"
+                  stroke="oklch(0.50 0.02 55)"
+                  strokeLinecap="round"
+                  strokeWidth="1.5"
+                />
+                {/* Right string */}
+                <path
+                  d="M30 0 C32 2, 44 12, 46 30 C48 44, 40 54, 30 64"
+                  stroke="oklch(0.50 0.02 55)"
+                  strokeLinecap="round"
+                  strokeWidth="1.5"
+                />
+                {/* String highlight */}
+                <path
+                  d="M30 0 C28 2, 17 12, 15 30"
+                  stroke="oklch(0.70 0.01 55 / 0.4)"
+                  strokeLinecap="round"
+                  strokeWidth="0.5"
+                />
+              </svg>
+            </div>
+
+            <Card className="calendar-paper relative overflow-hidden border-0 shadow-[0_8px_30px_-8px_rgba(0,0,0,0.12),0_25px_55px_-15px_rgba(0,0,0,0.15),0_0_0_1px_rgba(0,0,0,0.04)]">
+              {/* ── Spiral Binding ── */}
+              <div className="relative z-10 flex h-10 items-center justify-center gap-5 overflow-visible border-stone-200/60 border-b bg-linear-to-b from-stone-100 via-stone-50 to-transparent dark:border-stone-800/60 dark:from-stone-800/60 dark:via-stone-800/30">
+                {/* Top shadow for depth */}
+                <div className="absolute inset-x-0 top-0 h-px bg-stone-300/30 dark:bg-black/20" />
                 {SPIRAL_RING_MARKERS.map((ring) => (
-                  <div className="relative" key={ring}>
-                    <div className="h-4 w-4 rounded-full bg-linear-to-br from-stone-300 to-stone-400 shadow-inner" />
-                    <div className="absolute inset-0.75 rounded-full bg-linear-to-br from-stone-100 to-stone-200" />
+                  <div
+                    className="relative flex flex-col items-center"
+                    key={ring}
+                  >
+                    {/* Wire loop protruding above */}
+                    <div className="absolute -top-3.5 h-4 w-3 overflow-visible">
+                      <div className="absolute inset-0 rounded-t-full border-[1.5px] border-stone-400/80 border-b-0 bg-linear-to-b from-stone-300/20 to-transparent" />
+                      <div className="spiral-wire-shine absolute top-px left-px h-2.5 w-0.5 rounded-full bg-white/30" />
+                    </div>
+                    {/* Punch hole with depth */}
+                    <div className="relative h-3.5 w-3.5 rounded-full bg-linear-to-br from-stone-300 to-stone-400 shadow-[inset_0_1px_3px_rgba(0,0,0,0.25),0_0.5px_0_rgba(255,255,255,0.5)] dark:from-stone-800 dark:to-stone-950 dark:shadow-[inset_0_1px_3px_rgba(0,0,0,0.8),0_0.5px_0_rgba(255,255,255,0.1)]">
+                      <div className="absolute inset-0.75 rounded-full bg-linear-to-br from-stone-100 to-stone-200 shadow-[inset_0_-1px_2px_rgba(0,0,0,0.1)] dark:from-stone-700 dark:to-stone-800 dark:shadow-[inset_0_-1px_2px_rgba(0,0,0,0.5)]" />
+                    </div>
                   </div>
                 ))}
               </div>
 
-              {/* Hero Section */}
-              <div className="relative h-56 overflow-hidden border-stone-200 border-b bg-linear-to-br from-stone-800 via-stone-700 to-stone-900 sm:h-72 lg:h-80">
+              {/* ── Hero Section ── */}
+              <div className="relative h-40 overflow-hidden border-stone-200/40 border-b bg-linear-to-br from-stone-800 via-stone-700 to-stone-900 sm:h-52 lg:h-60">
                 <Image
                   alt={`${monthName} calendar artwork`}
                   className="object-cover"
@@ -905,33 +974,43 @@ export function PremiumCalendar() {
                   sizes="(max-width: 640px) 100vw, (max-width: 1024px) 80vw, 1200px"
                   src={heroArtworkSource}
                 />
-                <div className="absolute inset-0 bg-linear-to-t from-black/50 via-black/15 to-black/25" />
-                <div className="absolute inset-x-0 bottom-0 h-px bg-white/65" />
-                {/* Month Display */}
+                {/* Layered overlays for depth */}
+                <div className="absolute inset-0 bg-linear-to-t from-black/55 via-black/10 to-black/20" />
+                <div className="absolute inset-0 bg-linear-to-r from-black/15 to-transparent" />
+                <div className="absolute inset-x-0 bottom-0 h-px bg-white/40" />
+
+                {/* Quote */}
                 <div className="absolute top-6 left-6 sm:top-8 sm:left-10">
-                  <p className="font-medium text-sm text-white/60 uppercase tracking-[0.3em]">
-                    {monthQuote}
-                  </p>
+                  <div className="flex items-center gap-3">
+                    <div className="h-px w-6 bg-white/40" />
+                    <p className="font-medium text-[11px] text-white/55 uppercase tracking-[0.35em]">
+                      {monthQuote}
+                    </p>
+                  </div>
                 </div>
 
-                <div className="absolute right-6 bottom-16 text-right sm:right-10 sm:bottom-20">
-                  <div className="font-light text-lg text-white/70 tracking-wider sm:text-2xl">
+                {/* Month + Year display */}
+                <div className="absolute right-6 bottom-8 text-right sm:right-10 sm:bottom-10">
+                  <div className="font-light text-base text-white/60 tracking-[0.2em] sm:text-lg">
                     {yearNum}
                   </div>
-                  <div className="font-bold font-sans text-4xl text-white tracking-tight sm:text-6xl lg:text-7xl">
+                  <div
+                    className="font-bold font-display text-4xl text-white tracking-tight drop-shadow-[0_2px_12px_rgba(0,0,0,0.3)] sm:text-6xl lg:text-7xl"
+                    style={{ fontFamily: "var(--font-display)" }}
+                  >
                     {monthName}
                   </div>
                 </div>
               </div>
 
-              {/* Main Content */}
-              <div className="p-4 sm:p-8 lg:p-10">
+              {/* ── Main Content ── */}
+              <div className="p-5 sm:p-8 lg:p-10">
                 {/* Controls */}
                 <div className="mb-6 flex flex-col items-start justify-between gap-4 sm:mb-8 sm:flex-row sm:items-center">
                   <div className="flex items-center gap-3">
-                    <div className="flex items-center rounded-full bg-stone-100 p-1">
+                    <div className="flex items-center rounded-full bg-stone-100 p-1 dark:bg-stone-800/80">
                       <Button
-                        className="h-9 w-9 rounded-full hover:bg-white"
+                        className="h-9 w-9 rounded-full hover:bg-white dark:hover:bg-stone-700"
                         onClick={previousMonth}
                         size="icon"
                         variant="ghost"
@@ -939,7 +1018,7 @@ export function PremiumCalendar() {
                         <ChevronLeft className="h-4 w-4" />
                       </Button>
                       <Button
-                        className="rounded-full px-3 font-medium text-sm hover:bg-white"
+                        className="rounded-full px-3 font-medium text-sm hover:bg-white dark:hover:bg-stone-700"
                         onClick={goToToday}
                         size="sm"
                         variant="ghost"
@@ -947,7 +1026,7 @@ export function PremiumCalendar() {
                         Today
                       </Button>
                       <Button
-                        className="h-9 w-9 rounded-full hover:bg-white"
+                        className="h-9 w-9 rounded-full hover:bg-white dark:hover:bg-stone-700"
                         onClick={nextMonth}
                         size="icon"
                         variant="ghost"
@@ -967,21 +1046,36 @@ export function PremiumCalendar() {
                       }}
                       value={view}
                     >
-                      <TabsList className="rounded-full bg-stone-100 p-1">
+                      <TabsList className="rounded-full bg-stone-100 p-1 dark:bg-stone-800/80">
                         <TabsTrigger
-                          className="rounded-full px-4 data-[state=active]:bg-white data-[state=active]:shadow-sm"
+                          className="rounded-full px-4 data-[state=active]:bg-white data-[state=active]:shadow-sm dark:data-[state=active]:bg-stone-700"
                           value="month"
                         >
                           Calendar
                         </TabsTrigger>
                         <TabsTrigger
-                          className="rounded-full px-4 data-[state=active]:bg-white data-[state=active]:shadow-sm"
+                          className="rounded-full px-4 data-[state=active]:bg-white data-[state=active]:shadow-sm dark:data-[state=active]:bg-stone-700"
                           value="kanban"
                         >
                           Kanban
                         </TabsTrigger>
                       </TabsList>
                     </Tabs>
+
+                    <Button
+                      className="rounded-full shadow-lg shadow-stone-900/10 dark:shadow-black/50"
+                      onClick={() =>
+                        setTheme(theme === "dark" ? "light" : "dark")
+                      }
+                      size="icon"
+                      variant="ghost"
+                    >
+                      {mounted && theme === "dark" ? (
+                        <Sun className="h-4 w-4" />
+                      ) : (
+                        <Moon className="h-4 w-4" />
+                      )}
+                    </Button>
 
                     <Dialog
                       onOpenChange={(open) => {
@@ -1332,18 +1426,18 @@ export function PremiumCalendar() {
 
                 {/* Selection Helper */}
                 {selectedDates.length > 0 && view === "month" && (
-                  <div className="mb-6 flex items-center justify-between rounded-xl bg-linear-to-r from-stone-100 to-stone-50 p-4">
+                  <div className="mb-6 flex items-center justify-between rounded-xl border border-transparent bg-linear-to-r from-stone-100 to-stone-50 p-4 dark:border-stone-800/50 dark:from-stone-800/80 dark:to-stone-900/80">
                     <div className="flex items-center gap-3">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white shadow-sm">
-                        <CalendarIcon className="h-5 w-5 text-stone-600" />
+                      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white shadow-sm dark:bg-stone-700">
+                        <CalendarIcon className="h-5 w-5 text-stone-600 dark:text-stone-300" />
                       </div>
                       <div>
-                        <p className="font-medium text-sm text-stone-900">
+                        <p className="font-medium text-sm text-stone-900 dark:text-stone-100">
                           {selectedDates.length === 1
                             ? "Click same date again to create note, or select end date for range"
                             : "Date range selected"}
                         </p>
-                        <p className="text-stone-500 text-xs">
+                        <p className="text-stone-500 text-xs dark:text-stone-400">
                           {selectedDates[0].toLocaleDateString("default", {
                             month: "short",
                             day: "numeric",
@@ -1354,7 +1448,7 @@ export function PremiumCalendar() {
                       </div>
                     </div>
                     <Button
-                      className="text-stone-500"
+                      className="text-stone-500 dark:text-stone-400 dark:hover:bg-stone-800"
                       onClick={() => setSelectedDates([])}
                       size="sm"
                       variant="ghost"
@@ -1368,15 +1462,15 @@ export function PremiumCalendar() {
                 {view === "month" ? (
                   <div className="space-y-4">
                     {/* Day Headers */}
-                    <div className="grid grid-cols-7 gap-1">
-                      {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map(
+                    <div className="mb-1 grid grid-cols-7 gap-px">
+                      {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map(
                         (day, i) => (
                           <div
                             className={cn(
-                              "py-3 text-center font-semibold text-xs uppercase tracking-wider",
-                              i === 0 || i === 6
-                                ? "text-rose-400"
-                                : "text-stone-400"
+                              "py-2.5 text-center font-semibold text-[11px] uppercase tracking-[0.12em]",
+                              i === 5 || i === 6
+                                ? "text-(--cal-weekend)"
+                                : "text-(--cal-ink-light)"
                             )}
                             key={day}
                           >
@@ -1387,7 +1481,7 @@ export function PremiumCalendar() {
                     </div>
 
                     {/* Calendar Grid */}
-                    <div className="grid grid-cols-7 gap-1">
+                    <div className="grid grid-cols-7 gap-px overflow-hidden rounded-xl border border-stone-200/50 bg-stone-200/40 dark:border-stone-800 dark:bg-stone-900">
                       {days.map((date) => {
                         const dateKey = getDateKey(date);
                         const dayNotes = getNotesForDate(date);
@@ -1406,21 +1500,30 @@ export function PremiumCalendar() {
                             <PopoverTrigger asChild>
                               <button
                                 className={cn(
-                                  "relative aspect-square rounded-xl p-1 transition-all duration-300 sm:aspect-4/3 sm:p-2",
-                                  "group hover:z-10 hover:shadow-md",
-                                  !isCurrentMonthDate && "opacity-25",
-                                  isPast && isCurrentMonthDate && "opacity-40",
+                                  "relative aspect-square p-1.5 transition-all duration-200 sm:aspect-4/3 sm:p-2",
+                                  "group hover:z-10",
+                                  !isCurrentMonthDate &&
+                                    "bg-stone-100/60 opacity-20 dark:bg-stone-900/60",
+                                  isPast && isCurrentMonthDate && "opacity-45",
                                   isCurrentMonthDate &&
                                     !isPast &&
-                                    "bg-white hover:bg-stone-50",
+                                    !isTodayDate &&
+                                    !inRange &&
+                                    !isStart &&
+                                    !isEnd &&
+                                    "bg-(--cal-paper) hover:bg-stone-50 dark:hover:bg-white/5",
                                   isTodayDate &&
-                                    "bg-stone-900 ring-2 ring-stone-900 ring-offset-2 hover:bg-stone-800",
+                                    !isStart &&
+                                    !isEnd &&
+                                    "today-pulse bg-(--cal-today-bg) shadow-[inset_0_1px_0_rgba(255,255,255,0.1)]",
                                   inRange &&
                                     !isTodayDate &&
-                                    "bg-blue-100 hover:bg-blue-200",
+                                    !isStart &&
+                                    !isEnd &&
+                                    "bg-(--cal-accent-soft) hover:bg-blue-100 dark:hover:bg-(--cal-accent-soft)/80",
                                   (isStart || isEnd) &&
                                     !isTodayDate &&
-                                    "bg-blue-500 text-white hover:bg-blue-600"
+                                    "bg-(--cal-accent) text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.15)] hover:brightness-110"
                                 )}
                                 disabled={isPast && !isCurrentMonthDate}
                                 onClick={() => handleDateClick(date)}
@@ -1429,13 +1532,16 @@ export function PremiumCalendar() {
                                 <div className="flex h-full flex-col">
                                   <div
                                     className={cn(
-                                      "font-semibold text-sm sm:text-lg",
-                                      isTodayDate && "text-white",
+                                      "font-semibold text-sm tabular-nums sm:text-base",
+                                      isTodayDate &&
+                                        !isStart &&
+                                        !isEnd &&
+                                        "text-white",
                                       isWeekend &&
                                         !isTodayDate &&
                                         !isStart &&
                                         !isEnd &&
-                                        "text-rose-500",
+                                        "text-(--cal-weekend)",
                                       (isStart || isEnd) &&
                                         !isTodayDate &&
                                         "text-white"
@@ -1495,17 +1601,17 @@ export function PremiumCalendar() {
                             </PopoverTrigger>
                             <PopoverContent
                               align="start"
-                              className="w-80 overflow-hidden rounded-xl p-0"
+                              className="w-80 overflow-hidden rounded-xl p-0 dark:border-stone-800"
                             >
-                              <div className="border-b bg-linear-to-br from-stone-100 to-stone-50 p-4">
+                              <div className="border-b bg-linear-to-br from-stone-100 to-stone-50 p-4 dark:border-stone-800/60 dark:from-stone-800/80 dark:to-stone-900/80">
                                 <div className="flex items-center justify-between">
                                   <div>
-                                    <h4 className="font-semibold text-lg">
+                                    <h4 className="font-semibold text-lg dark:text-stone-100">
                                       {date.toLocaleDateString("default", {
                                         weekday: "long",
                                       })}
                                     </h4>
-                                    <p className="text-sm text-stone-500">
+                                    <p className="text-sm text-stone-500 dark:text-stone-400">
                                       {date.toLocaleDateString("default", {
                                         month: "long",
                                         day: "numeric",
@@ -1543,7 +1649,7 @@ export function PremiumCalendar() {
                   </div>
                 ) : (
                   /* Kanban View */
-                  <div className="grid grid-cols-1 gap-4 sm:gap-6 md:grid-cols-3">
+                  <div className="grid grid-cols-1 gap-6 sm:gap-8 md:grid-cols-3">
                     {(Object.keys(STATUS_CONFIG) as NoteStatus[]).map(
                       (status) => {
                         const config = STATUS_CONFIG[status];
@@ -1552,13 +1658,13 @@ export function PremiumCalendar() {
                         return (
                           <div
                             className={cn(
-                              "min-h-100 rounded-2xl border-2 p-4 transition-colors",
-                              config.borderColor,
-                              config.headerColor
+                              "min-h-100 rounded-xl border p-5 shadow-inner",
+                              config.color,
+                              config.borderColor
                             )}
                             key={status}
                           >
-                            <div className="mb-4 flex items-center justify-between">
+                            <div className="mb-5 flex items-center justify-between border-stone-200/60 border-b pb-3 dark:border-stone-800/60">
                               <div className="flex items-center gap-2">
                                 {status === "todo" && (
                                   <Circle className="h-4 w-4 text-stone-500" />
@@ -1569,12 +1675,12 @@ export function PremiumCalendar() {
                                 {status === "done" && (
                                   <CheckCircle2 className="h-4 w-4 text-emerald-500" />
                                 )}
-                                <h3 className="font-semibold text-stone-900">
+                                <h3 className="font-semibold text-(--cal-ink) text-sm uppercase tracking-wider">
                                   {config.label}
                                 </h3>
                               </div>
                               <Badge
-                                className="rounded-full"
+                                className="rounded-full bg-stone-200/50 text-(--cal-ink-light) dark:bg-stone-800"
                                 variant="secondary"
                               >
                                 {statusNotes.length}
@@ -1582,7 +1688,7 @@ export function PremiumCalendar() {
                             </div>
 
                             <Button
-                              className="mb-3 h-8 w-full justify-center rounded-lg border border-stone-300 border-dashed bg-white/60 text-stone-600 text-xs hover:bg-white"
+                              className="mb-4 h-10 w-full justify-center rounded-lg border-2 border-stone-300/40 border-dashed bg-transparent text-(--cal-ink-light) text-xs hover:bg-white/50"
                               disabled={!draggedNote}
                               onDragOver={(event) => event.preventDefault()}
                               onDrop={() => handleDropOnStatus(status)}
@@ -1593,9 +1699,9 @@ export function PremiumCalendar() {
                               Drop task here
                             </Button>
 
-                            <div className="space-y-3">
+                            <div className="space-y-4">
                               {statusNotes.length === 0 ? (
-                                <div className="py-12 text-center text-sm text-stone-400">
+                                <div className="py-12 text-center text-(--cal-ink-light) text-sm opacity-70">
                                   <p>No tasks</p>
                                 </div>
                               ) : (
@@ -1611,113 +1717,118 @@ export function PremiumCalendar() {
                                     note.startDate !== note.endDate;
 
                                   return (
-                                    <Card
+                                    <div
                                       className={cn(
-                                        "group cursor-grab border-l-4 p-4 transition-all hover:shadow-lg active:cursor-grabbing",
-                                        colorConfig.border.replace(
-                                          "border-",
-                                          "border-l-"
-                                        ),
-                                        "bg-white"
+                                        "group relative cursor-grab transition-all hover:z-10 hover:-translate-y-1 hover:shadow-xl active:cursor-grabbing"
                                       )}
-                                      draggable
                                       key={note.id}
-                                      onDragEnd={() => setDraggedNote(null)}
-                                      onDragStart={() => setDraggedNote(note)}
                                     >
-                                      <div className="flex items-start gap-3">
-                                        <GripVertical className="mt-0.5 h-4 w-4 shrink-0 text-stone-300 opacity-0 transition-opacity group-hover:opacity-100" />
-                                        <div className="min-w-0 flex-1">
-                                          <div className="flex items-start justify-between gap-2">
-                                            <h4 className="font-medium text-sm text-stone-900">
-                                              {note.title}
-                                            </h4>
-                                            <div className="flex shrink-0 gap-1 opacity-0 transition-opacity group-hover:opacity-100">
-                                              <Button
-                                                className="h-6 w-6"
-                                                onClick={() =>
-                                                  openNoteDialog(note)
-                                                }
-                                                size="icon"
-                                                variant="ghost"
-                                              >
-                                                <Edit2 className="h-3 w-3" />
-                                              </Button>
-                                              <Button
-                                                className="h-6 w-6 text-rose-500"
-                                                onClick={() =>
-                                                  handleDeleteNote(note.id)
-                                                }
-                                                size="icon"
-                                                variant="ghost"
-                                              >
-                                                <Trash2 className="h-3 w-3" />
-                                              </Button>
-                                            </div>
-                                          </div>
-
-                                          {note.description && (
-                                            <p className="mt-1 line-clamp-2 text-stone-500 text-xs">
-                                              {note.description}
-                                            </p>
-                                          )}
-
-                                          <div className="mt-3 flex items-center gap-2 text-stone-400 text-xs">
-                                            <CalendarIcon className="h-3 w-3" />
-                                            <span>
-                                              {startDate.toLocaleDateString(
-                                                "default",
-                                                {
-                                                  month: "short",
-                                                  day: "numeric",
-                                                }
-                                              )}
-                                              {isMultiDay &&
-                                                ` - ${endDate.toLocaleDateString("default", { month: "short", day: "numeric" })}`}
-                                            </span>
-                                          </div>
-
-                                          {note.location && (
-                                            <div className="mt-1 flex items-center gap-2 text-stone-400 text-xs">
-                                              <MapPin className="h-3 w-3" />
-                                              <span className="truncate">
-                                                {note.location}
-                                              </span>
-                                            </div>
-                                          )}
-
-                                          <div className="mt-3 flex flex-wrap items-center gap-1.5">
-                                            <Badge
-                                              className={cn(
-                                                "px-1.5 py-0 text-[10px]",
-                                                PRIORITY_CONFIG[note.priority]
-                                                  .color
-                                              )}
-                                              variant="outline"
-                                            >
-                                              <PriorityIcon className="mr-1 h-2.5 w-2.5" />
-                                              {note.priority}
-                                            </Badge>
-                                            {(note.tags || [])
-                                              .slice(0, 2)
-                                              .map((tag) => (
-                                                <Badge
-                                                  className="px-1.5 py-0 text-[10px]"
-                                                  key={tag}
-                                                  variant="secondary"
+                                      {/* Sticky note drop shadow */}
+                                      <div className="absolute inset-0 translate-y-1 rotate-1 rounded-sm bg-black/10 blur-sm" />
+                                      {/* Sticky note body */}
+                                      <Card
+                                        className={cn(
+                                          "relative h-full w-full rounded-none border border-black/5 p-4 shadow-sm dark:border-white/5",
+                                          colorConfig.light
+                                        )}
+                                        draggable
+                                        onDragEnd={() => setDraggedNote(null)}
+                                        onDragStart={() => setDraggedNote(note)}
+                                      >
+                                        <div className="flex items-start gap-3 pl-1">
+                                          <GripVertical className="mt-0.5 h-4 w-4 shrink-0 text-current opacity-20 transition-opacity hover:opacity-50" />
+                                          <div className="min-w-0 flex-1">
+                                            <div className="flex items-start justify-between gap-2">
+                                              <h4 className="font-medium text-inherit text-sm leading-snug">
+                                                {note.title}
+                                              </h4>
+                                              <div className="flex shrink-0 gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+                                                <Button
+                                                  className="h-6 w-6 hover:bg-black/5 dark:hover:bg-white/10"
+                                                  onClick={() =>
+                                                    openNoteDialog(note)
+                                                  }
+                                                  size="icon"
+                                                  variant="ghost"
                                                 >
-                                                  {tag}
-                                                </Badge>
-                                              ))}
-                                            {(note.tags || []).length > 2 && (
-                                              <span className="text-[10px] text-stone-400">
-                                                +{note.tags.length - 2}
-                                              </span>
+                                                  <Edit2 className="h-3 w-3 text-current opacity-70" />
+                                                </Button>
+                                                <Button
+                                                  className="h-6 w-6 hover:bg-rose-500/10"
+                                                  onClick={() =>
+                                                    handleDeleteNote(note.id)
+                                                  }
+                                                  size="icon"
+                                                  variant="ghost"
+                                                >
+                                                  <Trash2 className="h-3 w-3 text-rose-600" />
+                                                </Button>
+                                              </div>
+                                            </div>
+
+                                            {note.description && (
+                                              <p className="mt-2 line-clamp-2 text-xs italic opacity-80">
+                                                {note.description}
+                                              </p>
                                             )}
+
+                                            <div className="mt-3 flex items-center gap-2 text-xs opacity-70">
+                                              <CalendarIcon className="h-3 w-3" />
+                                              <span>
+                                                {startDate.toLocaleDateString(
+                                                  "default",
+                                                  {
+                                                    month: "short",
+                                                    day: "numeric",
+                                                  }
+                                                )}
+                                                {isMultiDay &&
+                                                  ` - ${endDate.toLocaleDateString("default", { month: "short", day: "numeric" })}`}
+                                              </span>
+                                            </div>
+
+                                            {note.location && (
+                                              <div className="mt-1 flex items-center gap-2 text-xs opacity-70">
+                                                <MapPin className="h-3 w-3" />
+                                                <span className="truncate">
+                                                  {note.location}
+                                                </span>
+                                              </div>
+                                            )}
+
+                                            <div className="mt-3 flex flex-wrap items-center gap-1.5">
+                                              <Badge
+                                                className={cn(
+                                                  "border-black/5 bg-white/40 px-1.5 py-0 text-[10px] dark:border-white/5 dark:bg-black/20",
+                                                  PRIORITY_CONFIG[note.priority]
+                                                    .color
+                                                )}
+                                                variant="outline"
+                                              >
+                                                <PriorityIcon className="mr-1 h-2.5 w-2.5" />
+                                                {note.priority}
+                                              </Badge>
+                                              {(note.tags || [])
+                                                .slice(0, 2)
+                                                .map((tag) => (
+                                                  <Badge
+                                                    className="border-black/5 bg-white/40 px-1.5 py-0 text-[10px] text-current opacity-80 dark:border-white/5 dark:bg-black/20"
+                                                    key={tag}
+                                                    variant="secondary"
+                                                  >
+                                                    {tag}
+                                                  </Badge>
+                                                ))}
+                                              {(note.tags || []).length > 2 && (
+                                                <span className="text-[10px] opacity-60">
+                                                  +{note.tags.length - 2}
+                                                </span>
+                                              )}
+                                            </div>
                                           </div>
                                         </div>
-                                      </div>
-                                    </Card>
+                                      </Card>
+                                    </div>
                                   );
                                 })
                               )}
@@ -1730,24 +1841,24 @@ export function PremiumCalendar() {
                 )}
 
                 {/* Footer */}
-                <div className="mt-8 flex flex-wrap items-center justify-between gap-4 border-stone-100 border-t pt-6 text-stone-400 text-xs">
-                  <div className="flex items-center gap-4">
+                <div className="mt-8 flex flex-wrap items-center justify-between gap-4 border-stone-200/60 border-t pt-5 text-(--cal-ink-light) text-[11px]">
+                  <div className="flex items-center gap-5">
                     <span className="flex items-center gap-1.5">
-                      <div className="h-2 w-2 rounded-full bg-stone-900" />
+                      <div className="h-2.5 w-2.5 rounded-full bg-(--cal-today-bg)" />
                       Today
                     </span>
                     <span className="flex items-center gap-1.5">
-                      <div className="h-2 w-2 rounded-full bg-blue-500" />
+                      <div className="h-2.5 w-2.5 rounded-full bg-(--cal-accent)" />
                       Selected
                     </span>
                     <span className="flex items-center gap-1.5">
-                      <div className="h-2 w-2 rounded-full bg-rose-400" />
+                      <div className="h-2.5 w-2.5 rounded-full bg-(--cal-weekend)" />
                       Weekend
                     </span>
                   </div>
-                  <p>
-                    Click a date to select, click again for single note, or
-                    click another date for range
+                  <p className="tracking-wide">
+                    Click a date to select · click again for note · or pick a
+                    range
                   </p>
                 </div>
               </div>
